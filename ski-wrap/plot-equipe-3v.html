@@ -1,0 +1,1189 @@
+<title>Plot Equipe 3V</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Saira+Condensed:wght@600;800&display=swap">
+<style>
+/* Layout: a cutting mat holds the pair at true relative scale plus a zoomed detail; a spec panel sits beside it and stacks below on phones. */
+:root {
+  --bg: #ECEFF2;
+  --surface: #FFFFFF;
+  --ink: #10151B;
+  --muted: #586370;
+  --line: rgba(16, 21, 27, 0.10);
+  --accent: #1F4FD6;
+  --tech: #D4007A;
+  --field: #F4F6F8;
+
+  /* The mat is a physical object: same in both themes. */
+  --mat: #1C2832;
+  --mat-ink: rgba(255, 255, 255, 0.86);
+  --mat-muted: rgba(255, 255, 255, 0.50);
+  --mat-chip: rgba(255, 255, 255, 0.08);
+  --mat-chip-on: rgba(255, 255, 255, 0.16);
+
+  --font-display: "Saira Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0C1015;
+    --surface: #141A21;
+    --ink: #E6EBF0;
+    --muted: #8B96A3;
+    --line: rgba(230, 235, 240, 0.10);
+    --accent: #7D98FF;
+    --tech: #FF4FAE;
+    --field: #1B222B;
+    --mat: #17222B;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0C1015;
+  --surface: #141A21;
+  --ink: #E6EBF0;
+  --muted: #8B96A3;
+  --line: rgba(230, 235, 240, 0.10);
+  --accent: #7D98FF;
+  --tech: #FF4FAE;
+  --field: #1B222B;
+  --mat: #17222B;
+  color-scheme: dark;
+}
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  max-width: 1240px;
+  margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 24px 112px;
+  display: grid;
+  gap: 20px;
+}
+
+/* Header */
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px 24px;
+}
+.top-text { min-width: 0; }
+.eyebrow {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+h1 {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: clamp(40px, 7vw, 64px);
+  line-height: 0.95;
+  letter-spacing: -0.01em;
+  text-wrap: balance;
+}
+.lede {
+  margin: 8px 0 0;
+  max-width: 62ch;
+  color: var(--muted);
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.chips li {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--surface);
+  box-shadow: 0 0 0 1px var(--line);
+}
+
+/* Main grid */
+.main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .main { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Mat */
+.mat {
+  background: var(--mat);
+  border-radius: 16px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  height: clamp(540px, calc(100vh - 300px), 860px);
+  color: var(--mat-ink);
+  min-width: 0;
+}
+.mat-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  font-size: 13px;
+}
+.mat-bar .label {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--mat-muted);
+  font-variant-numeric: tabular-nums;
+}
+#stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  justify-content: center;
+  gap: clamp(12px, 3vw, 40px);
+}
+.view {
+  margin: 0;
+  height: 100%;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.view svg {
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+  width: auto;
+  max-width: 100%;
+  display: block;
+}
+/* Wide mats show every detail at once; phones show one and switch with the control. */
+.view.detail { display: none; }
+.view.detail[data-on] { display: flex; }
+@media (min-width: 640px) {
+  .view.detail { display: flex; }
+  #segCrop { display: none; }
+}
+.view figcaption {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--mat-muted);
+  text-align: center;
+}
+
+/* Segmented controls on the mat */
+.seg {
+  position: relative;
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  border-radius: 999px;
+  background: var(--mat-chip);
+}
+.seg-hl {
+  position: absolute;
+  top: 3px;
+  left: 0;
+  height: 26px;
+  border-radius: 999px;
+  background: var(--mat-chip-on);
+  will-change: transform;
+}
+.seg[data-ready] .seg-hl {
+  transition: transform 200ms var(--ease-out), width 200ms var(--ease-out);
+}
+.seg button {
+  position: relative;
+  height: 26px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--mat-muted);
+  font: 500 12px/1 var(--font-body);
+  cursor: pointer;
+  transition: color 150ms ease;
+}
+.seg button[aria-pressed="true"] { color: #fff; }
+.seg button:focus-visible { outline: 2px solid rgba(255, 255, 255, 0.5); outline-offset: 2px; }
+.seg button:active { transform: scale(0.97); }
+
+/* SVG layers that the view mode swaps */
+.binding, .tech { transition: opacity 150ms ease; }
+[data-view="mounted"] .tech { opacity: 0; }
+[data-view="flat"] .binding { opacity: 0; }
+
+/* Panel */
+.panel {
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: 0 0 0 1px var(--line), 0 10px 30px rgba(16, 21, 27, 0.06);
+  padding: 20px;
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+.v-head h2 {
+  margin: 2px 0 0;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 44px;
+  line-height: 1;
+}
+.v-head p { margin: 8px 0 0; }
+.axis {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+.trade {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin: 0;
+}
+.trade div { min-width: 0; }
+.trade dt, .block h3 {
+  margin: 0 0 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.trade dd { margin: 0; font-size: 14px; }
+.block { display: grid; gap: 8px; min-width: 0; }
+.block h3 { margin: 0; }
+.block p { margin: 0; font-size: 14px; }
+
+.swatches {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 6px;
+}
+.swatch {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--field);
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+  transition: transform 160ms ease-out;
+}
+.swatch:active { transform: scale(0.97); }
+.swatch:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.chip {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  box-shadow: 0 0 0 1px var(--line) inset;
+}
+.swatch span:last-child { display: grid; min-width: 0; line-height: 1.2; }
+.swatch b { font-weight: 500; font-size: 12px; }
+.swatch small {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* Form */
+.fields { display: grid; gap: 12px; }
+.row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.field { display: grid; gap: 4px; min-width: 0; }
+.field label {
+  font-size: 12px;
+  color: var(--muted);
+}
+.field input, .field select {
+  width: 100%;
+  box-sizing: border-box;
+  height: 38px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--field);
+  color: var(--ink);
+  box-shadow: 0 0 0 1px var(--line) inset;
+  font: 500 14px/1 var(--font-body);
+  font-variant-numeric: tabular-nums;
+}
+.field input:focus-visible, .field select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.hint { font-size: 12px; color: var(--muted); margin: 0; }
+
+.btn {
+  height: 44px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--ink);
+  color: var(--surface);
+  font: 600 14px/1 var(--font-body);
+  cursor: pointer;
+  transition: transform 160ms ease-out;
+}
+.btn:active { transform: scale(0.97); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn span { display: inline-block; transition: filter 200ms ease, opacity 200ms ease; }
+.btn span.swap { filter: blur(2px); opacity: 0.6; }
+
+/* Notes */
+.notes {
+  background: var(--surface);
+  border-radius: 16px;
+  box-shadow: 0 0 0 1px var(--line);
+  padding: 20px;
+}
+.notes h2 {
+  margin: 0 0 10px;
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 28px;
+  line-height: 1;
+}
+.notes ul {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 6px;
+  max-width: 75ch;
+}
+.notes li::marker { color: var(--tech); }
+.tech-word { color: var(--tech); font-weight: 600; }
+
+@media (hover: hover) and (pointer: fine) {
+  .seg button:hover { color: rgba(255, 255, 255, 0.85); }
+  .swatch:hover { background: color-mix(in srgb, var(--field) 80%, var(--ink) 6%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .seg[data-ready] .seg-hl { transition: none; }
+  .btn:active, .swatch:active, .seg button:active { transform: none; }
+}
+@media (max-width: 520px) {
+  .row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .trade { grid-template-columns: 1fr; }
+  .mat { height: clamp(480px, 72vh, 640px); }
+}
+
+/* ---- Picker: verbatim from the prototype skill's PICKER.md ---- */
+.proto-picker {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2147483647;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(10, 10, 10, 0.82);
+  -webkit-backdrop-filter: blur(12px) saturate(1.4);
+  backdrop-filter: blur(12px) saturate(1.4);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset,
+    0 8px 24px rgba(0, 0, 0, 0.24),
+    0 2px 6px rgba(0, 0, 0, 0.12);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 13px;
+  line-height: 1;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.proto-picker-highlight {
+  position: absolute;
+  top: 4px;
+  left: 0;
+  height: 28px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  will-change: transform;
+}
+
+/* The slide is enabled only after first paint (data-ready), so load doesn't animate. */
+.proto-picker[data-ready] .proto-picker-highlight {
+  transition:
+    transform 250ms cubic-bezier(0.23, 1, 0.32, 1),
+    width 250ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .proto-picker[data-ready] .proto-picker-highlight { transition: none; }
+}
+
+.proto-picker-item {
+  position: relative; /* sits above the highlight */
+  display: flex;
+  align-items: center;
+  height: 28px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.55);
+  font: inherit;
+  cursor: pointer;
+  transition: color 150ms ease-out;
+}
+
+.proto-picker-item:hover {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.proto-picker-item:active {
+  transform: scale(0.97);
+}
+
+.proto-picker-item:focus-visible {
+  outline: 2px solid rgba(255, 255, 255, 0.4);
+  outline-offset: 2px;
+}
+
+.proto-picker-item[data-active] {
+  color: #fff;
+}
+
+.proto-picker-divider {
+  width: 1px;
+  height: 16px;
+  margin: 0 4px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.proto-picker-replay {
+  padding: 0 10px;
+  font-size: 14px;
+}
+
+.proto-picker[data-position="top"] {
+  bottom: auto;
+  top: 24px;
+}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="top-text">
+      <p class="eyebrow">Plot de vinil · Salomon Equipe 10 3V Prolink</p>
+      <h1>Plot Equipe 3V</h1>
+      <p class="lede">Cuatro diseños originales para tus skis, inspirados en las bandas curvas y los colores de la tabla de tu referencia. Cambia de opción con la barra de abajo o con las teclas 1–4.</p>
+    </div>
+    <ul class="chips" id="chips" aria-label="Medidas usadas"></ul>
+  </header>
+
+  <div class="main">
+    <section class="mat" id="stageWrap" data-view="mounted" aria-label="Vista previa sobre tapete de corte">
+      <div class="mat-bar">
+        <div class="seg" id="segView" role="group" aria-label="Vista">
+          <span class="seg-hl" aria-hidden="true"></span>
+          <button type="button" data-val="mounted" aria-pressed="true">Montado</button>
+          <button type="button" data-val="flat" aria-pressed="false">Plano de plot</button>
+        </div>
+        <div class="seg" id="segCrop" role="group" aria-label="Detalle">
+          <span class="seg-hl" aria-hidden="true"></span>
+          <button type="button" data-val="tip" aria-pressed="true">Punta</button>
+          <button type="button" data-val="mid" aria-pressed="false">Centro</button>
+          <button type="button" data-val="tail" aria-pressed="false">Cola</button>
+        </div>
+      </div>
+      <div id="stage"></div>
+    </section>
+
+    <aside class="panel" aria-live="polite">
+      <div id="variantInfo"></div>
+
+      <form class="block" id="form" autocomplete="off">
+        <h3>Personaliza</h3>
+        <div class="fields">
+          <div class="field">
+            <label for="fText">Texto en la cola</label>
+            <input id="fText" name="text" maxlength="18" value="EQUIPE 10" spellcheck="false">
+          </div>
+          <div class="row">
+            <div class="field">
+              <label for="fLen">Largo</label>
+              <select id="fLen" name="len">
+                <option value="1550">155 cm</option>
+                <option value="1600">160 cm</option>
+                <option value="1650" selected>165 cm</option>
+                <option value="1700">170 cm</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="fTip">Punta mm</label>
+              <input id="fTip" name="tip" type="number" inputmode="numeric" min="80" max="140" value="105">
+            </div>
+            <div class="field">
+              <label for="fWaist">Cintura mm</label>
+              <input id="fWaist" name="waist" type="number" inputmode="numeric" min="55" max="110" value="64">
+            </div>
+            <div class="field">
+              <label for="fTail">Cola mm</label>
+              <input id="fTail" name="tail" type="number" inputmode="numeric" min="70" max="135" value="94">
+            </div>
+          </div>
+          <p class="hint">Medidas aproximadas del modelo. Mide tus skis con cinta antes de mandar a imprimir.</p>
+        </div>
+      </form>
+
+      <div class="block" id="dlBlock">
+        <button class="btn" id="dl" type="button"><span>Descargar SVG para plotter</span></button>
+        <p class="hint" id="dlHint">Un archivo con ambos skis a escala 1:1 en mm, 3 mm de sangrado y línea de corte <span class="tech-word">CutContour</span>.</p>
+      </div>
+    </aside>
+  </div>
+
+  <section class="notes" aria-labelledby="notesTitle">
+    <h2 id="notesTitle">Antes de plotear</h2>
+    <ul>
+      <li>Mide largo, punta, cintura y cola de tus skis. No encontré la ficha de fábrica del Equipe 10 3V, así que las medidas de arriba son una estimación; ajústalas y vuelve a descargar.</li>
+      <li>Desmonta la fijación. En la vista <b>Plano de plot</b>, la zona <span class="tech-word">magenta</span> marca dónde van la placa y los brazos Prolink; su forma aquí es aproximada.</li>
+      <li>Los brazos Prolink van elevados sobre el ski: recorta el vinil alrededor de ellos en vez de pasar por encima.</li>
+      <li>Pide vinil <i>cast</i> con laminado. El calandrado se encoge con el frío y se levanta en las orillas.</li>
+      <li>Aplica desde el centro hacia la punta y la cola, y recorta el sobrante con cúter siguiendo el borde del ski. Las marcas de centro de bota del archivo te ayudan a alinear.</li>
+      <li>El texto del SVG usa la fuente Saira Condensed. Pide a la imprenta que lo convierta a contornos, o usa los archivos ya convertidos del repositorio.</li>
+    </ul>
+  </section>
+</div>
+
+<nav class="proto-picker" aria-label="Prototype variants">
+  <span class="proto-picker-highlight" aria-hidden="true"></span>
+  <button class="proto-picker-item" data-active aria-current="true">Órbita</button>
+  <button class="proto-picker-item">Corte</button>
+  <button class="proto-picker-item">Contorno</button>
+  <button class="proto-picker-item">Mural</button>
+</nav>
+
+<script>
+/* ================= Ski geometry (all units in mm) ================= */
+
+const n1 = (v) => Math.round(v * 10) / 10;
+const pt = (p) => n1(p[0]) + ' ' + n1(p[1]);
+const esc = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+const state = { text: 'EQUIPE 10', L: 1650, tip: 105, waist: 64, tail: 94, crop: 'tip' };
+
+function geo(s) {
+  const L = s.L, T = s.tip / 2, W = s.waist / 2, Tl = s.tail / 2;
+  const y0 = L * 0.122;           // widest point at the shovel
+  const y1 = L * 0.955;           // widest point at the tail
+  const ybc = L * 0.535;          // boot center, also the waist
+  const hw = (y) => {
+    if (y <= 0 || y >= L) return 0;
+    if (y < y0) return T * Math.pow(Math.sin((y / y0) * Math.PI / 2), 0.55);
+    if (y <= ybc) { const u = (ybc - y) / (ybc - y0); return W + (T - W) * u * u; }
+    if (y <= y1) { const u = (y - ybc) / (y1 - ybc); return W + (Tl - W) * u * u; }
+    const t = (y - y1) / (L - y1);
+    return Tl * Math.pow(1 - Math.pow(t, 4), 0.25);
+  };
+  const ys = [];
+  for (let y = 0; y < y0; y += y < 24 ? 0.5 : 2) ys.push(y);
+  for (let y = y0; y < y1; y += 8) ys.push(y);
+  for (let y = y1; y < L; y += L - y < 10 ? 0.4 : 1.5) ys.push(y);
+  ys.push(L);
+  const pts = ys.map((y) => [hw(y), y]);
+
+  // Outline offset outward by d (d = 0 is the cut line, d = 3 the bleed).
+  function outline(d = 0) {
+    const right = pts.map((p, i) => {
+      if (i === 0) return [0, -d];
+      if (i === pts.length - 1) return [0, L + d];
+      const a = pts[i - 1], b = pts[i + 1];
+      const tx = b[0] - a[0], ty = b[1] - a[1], len = Math.hypot(tx, ty) || 1;
+      return [p[0] + d * ty / len, p[1] - d * tx / len];
+    });
+    const left = right.slice(1, -1).reverse().map(([x, y]) => [-x, y]);
+    return 'M' + right.map(pt).join('L') + 'L' + left.map(pt).join('L') + 'Z';
+  }
+
+  // Zones. The binding is a fixed size; the free zones shrink with shorter skis.
+  const techTop = ybc - 535, techBot = ybc + 412;
+  const textY0 = techBot + 18, textY1 = L - 140;
+  return {
+    L, hw, outline, ybc, y0, y1, techTop, techBot,
+    text: { y: (textY0 + textY1) / 2, max: textY1 - textY0 },
+    specY: L - 62,
+    wmax: Math.max(s.tip, s.tail),
+  };
+}
+
+/* ================= Drawing helpers ================= */
+
+const C = { K: '#121315', W: '#F6F6F1', G: '#1E9E4A', O: '#F0642A', B: '#1F4FD6', D: '#17191D' };
+
+// Cubic S-curve from (x0,ya) to (x1,yb), flat at the ends, steep in the middle.
+function sCurve(x0, ya, x1, yb, k = 0.5) {
+  return [[x0, ya], [x0 + (x1 - x0) * k, ya], [x1 - (x1 - x0) * k, yb], [x1, yb]];
+}
+// Filled region between the curve shifted by a and by b (in y).
+function band(c, a, b, fill) {
+  const A = c.map(([x, y]) => [x, y + a]);
+  const B = c.map(([x, y]) => [x, y + b]).reverse();
+  return `<path fill="${fill}" d="M${pt(A[0])}C${pt(A[1])} ${pt(A[2])} ${pt(A[3])}L${pt(B[0])}C${pt(B[1])} ${pt(B[2])} ${pt(B[3])}Z"/>`;
+}
+// Stack of stripes centered on the curve.
+function bundle(c, stripes) {
+  const total = stripes.reduce((s, [, t]) => s + t, 0);
+  let y = -total / 2, out = '';
+  for (const [fill, t] of stripes) { out += band(c, y, y + t, fill); y += t; }
+  return out;
+}
+function chevron(apex, t, drop, fill, up = true) {
+  const s = up ? 1 : -1;
+  const p = [[-90, apex + s * drop], [0, apex], [90, apex + s * drop], [90, apex + s * drop + t], [0, apex + t], [-90, apex + s * drop + t]];
+  return `<path fill="${fill}" d="M${p.map(pt).join('L')}Z"/>`;
+}
+// Wobbly contour ring, stretched along the ski.
+function ring(cx, cy, r, sy, i, seed) {
+  let d = '';
+  for (let k = 0; k <= 120; k++) {
+    const th = (k / 120) * Math.PI * 2;
+    const rr = r * (1 + 0.10 * Math.sin(2 * th + seed + i * 0.17) + 0.06 * Math.sin(3 * th + seed * 1.7 - i * 0.11));
+    d += (k ? 'L' : 'M') + n1(cx + rr * Math.cos(th)) + ' ' + n1(cy + sy * rr * Math.sin(th));
+  }
+  return d + 'Z';
+}
+
+// Text runs along the ski, reading from tail to tip, and shrinks to fit its zone.
+function skiText(g, str, o) {
+  const t = str.trim().toUpperCase();
+  if (!t) return '';
+  const width = 2 * g.hw(g.text.y);
+  const size = Math.min(o.size || width * 0.56, g.text.max / (t.length * 0.5 + 0.4));
+  const tr = `translate(${n1(o.x || 0)} ${n1(o.y ?? g.text.y)}) rotate(-90)${o.skew ? ` skewX(${o.skew})` : ''}`;
+  const halo = o.halo ? ` stroke="${o.halo}" stroke-width="${n1(size * 0.16)}" stroke-linejoin="round" paint-order="stroke"` : '';
+  return `<text transform="${tr}" text-anchor="middle" dy="0.35em" font-family="'Saira Condensed', 'Arial Narrow', sans-serif" font-weight="800" font-size="${n1(size)}" letter-spacing="${n1(size * (o.track || 0.02))}" fill="${o.fill}"${halo}>${esc(t)}</text>`;
+}
+function specLine(g, s, fill) {
+  const t = `${s.tip}·${s.waist}·${s.tail}  ${s.L / 10}`;
+  return `<text transform="translate(0 ${n1(g.specY)}) rotate(-90)" text-anchor="middle" dy="0.35em" font-family="'IBM Plex Mono', ui-monospace, monospace" font-weight="500" font-size="7" letter-spacing="0.8" fill="${fill}" fill-opacity="0.75" xml:space="preserve">${esc(t)}</text>`;
+}
+
+/* ================= Variants ================= */
+
+const VARIANTS = [
+  {
+    slug: 'orbita',
+    name: 'Órbita',
+    axis: 'Curvas · fiel a la referencia',
+    blurb: 'Bandas de cinco franjas que cruzan el ski en S, con lóbulos blancos y esquinas azules, como los paneles del balón de tu referencia.',
+    when: 'Quieres que se reconozca de inmediato la idea de la tabla Brazuca.',
+    cost: 'Franjas de 3 mm: necesita impresión digital, no sale en vinil de corte.',
+    production: 'Impresión digital en vinil cast + laminado brillante. Cinco tintas planas.',
+    palette: [['Blanco', C.W], ['Negro', C.K], ['Verde', C.G], ['Naranja', C.O], ['Azul cobalto', C.B]],
+    base: C.W,
+    mirror: true,
+    art(g) {
+      const L = g.L, sp = 0.075 * L;
+      const centers = [0.035, 0.185, 0.34, 0.5, 0.66, 1.0];
+      const R1 = [[C.K, 6], [C.G, 14], [C.K, 4], [C.O, 14], [C.K, 6]];
+      const R2 = [[C.K, 6], [C.O, 14], [C.K, 4], [C.G, 14], [C.K, 6]];
+      let blobs = '', lines = '', bands = '';
+      centers.forEach((f, i) => {
+        const dir = i % 2 ? -1 : 1, c = f * L;
+        const curve = sCurve(-80 * dir, c - sp / 2, 80 * dir, c + sp / 2);
+        // Blue fills the narrow corner between this bundle and the next one.
+        const next = centers[i + 1];
+        if (next && next - f < 0.2) {
+          const by = ((f + next) / 2) * L;
+          blobs += `<circle cx="${n1(dir * g.hw(by))}" cy="${n1(by)}" r="54" fill="${C.B}" stroke="${C.K}" stroke-width="5"/>`;
+        }
+        // Thin outline that follows each lobe, like a panel seam.
+        lines += band(curve, -35, -32, C.K) + band(curve, 32, 35, C.K);
+        bands += bundle(curve, i % 2 ? R2 : R1);
+      });
+      return blobs + lines + bands;
+    },
+    text(g, s) {
+      return skiText(g, s.text, { fill: C.K }) + specLine(g, s, C.K);
+    },
+  },
+  {
+    slug: 'corte',
+    name: 'Corte',
+    axis: 'Ángulos · fondo oscuro',
+    blurb: 'Chevrones que se aprietan hacia la punta y un filete naranja que sigue la curva lateral del ski. Mismos colores, lenguaje de carrera.',
+    when: 'Quieres que se vea rápido y que el uso no se note tanto.',
+    cost: 'Es el que más se aleja de la referencia; los rayones blancos se ven más sobre grafito.',
+    production: 'Impresión digital + laminado mate. El grafito disimula las marcas de las orillas.',
+    palette: [['Grafito', C.D], ['Blanco', C.W], ['Verde', C.G], ['Naranja', C.O], ['Azul cobalto', C.B]],
+    base: C.D,
+    mirror: true,
+    art(g) {
+      const L = g.L;
+      let out = '';
+      // Pinstripes that trace the sidecut on the outer edge.
+      const edge = (inset) => {
+        let d = '';
+        for (let y = 20; y <= L - 20; y += 10) d += (d ? 'L' : 'M') + n1(-(g.hw(y) - inset)) + ' ' + y;
+        return d;
+      };
+      out += `<path d="${edge(8)}" fill="none" stroke="${C.O}" stroke-width="2.2"/>`;
+      out += `<path d="${edge(12.5)}" fill="none" stroke="${C.G}" stroke-width="1.2"/>`;
+      // Tip chevrons: tight at the tip, opening toward the binding.
+      const seq = [[C.W, 3, 6], [C.G, 16, 8], [C.O, 12, 10], [C.B, 20, 14], [C.W, 3, 18], [C.G, 8, 24], [C.O, 5, 30], [C.B, 3, 0]];
+      let a = 0.04 * L;
+      for (const [fill, t, gap] of seq) { out += chevron(a, t, 55, fill); a += t + gap; }
+      // One long slash in front of the binding.
+      const sl = sCurve(-90, 0.265 * L, 90, 0.19 * L, 0.2);
+      out += band(sl, 0, 22, C.O) + band(sl, 26, 29, C.W);
+      // Tail: inverted chevrons behind the heel, solid cap at the end.
+      let b = g.ybc + 268;
+      for (const [fill, t] of [[C.B, 12], [C.G, 6], [C.O, 3]]) { out += chevron(b, t, 40, fill, false); b += t + 7; }
+      out += `<rect x="-80" y="${n1(L - 26)}" width="160" height="60" fill="${C.B}"/>`;
+      return out;
+    },
+    text(g, s) {
+      return skiText(g, s.text, { fill: C.W, skew: -12 }) + specLine(g, s, C.W);
+    },
+  },
+  {
+    slug: 'contorno',
+    name: 'Contorno',
+    axis: 'Línea · mínima tinta',
+    blurb: 'Curvas de nivel que nacen en la punta y en la cola, con un punto de color en cada centro. Cambia el balón por la montaña.',
+    when: 'Prefieres algo sobrio que envejezca bien, o quieres hacerlo sin impresión.',
+    cost: 'Pierde la energía multicolor de la referencia.',
+    production: 'Puede ir sin impresión: base de vinil blanco + líneas de vinil negro de corte (trazo 1.6 mm, fácil de depilar). Los acentos van como tercera capa.',
+    palette: [['Blanco', C.W], ['Negro', C.K], ['Naranja', C.O], ['Azul cobalto', C.B]],
+    base: C.W,
+    mirror: true,
+    art(g) {
+      const L = g.L;
+      const set = (cx, cy, sy, n, r0, step, seed, fill) => {
+        let fills = `<path d="${ring(cx, cy, r0, sy, 0, seed)}" fill="${fill || 'none'}"/>`, d = '';
+        for (let i = 0; i < n; i++) d += ring(cx, cy, r0 + i * step, sy, i, seed);
+        return fills + `<path d="${d}" fill="none" stroke="${C.K}" stroke-width="1.6" stroke-linejoin="round"/>`;
+      };
+      return set(14, 0.13 * L, 3.0, 16, 7, 6.2, 0.6, C.O)
+        + set(22, 0.53 * L, 3.4, 11, 6, 7, 2.1, null)
+        + set(-12, 0.915 * L, 2.6, 13, 6, 6.4, 4.2, C.B);
+    },
+    text(g, s) {
+      return skiText(g, s.text, { fill: C.K, halo: C.W, track: 0.08 }) + specLine(g, s, C.K);
+    },
+  },
+  {
+    slug: 'mural',
+    name: 'Mural',
+    axis: 'Composición · el par es un lienzo',
+    blurb: 'Tres campos de color enormes y dos costuras circulares que cruzan de un ski al otro. Juntos se leen como un solo gráfico y tu texto se reparte entre los dos.',
+    when: 'Quieres que se reconozcan desde el telesilla y sueles cargarlos juntos.',
+    cost: 'Cada ski solo es un fragmento; hay que alinear bien al aplicar.',
+    production: 'Impresión digital + laminado brillante. Imprime los dos en la misma tirada para que el color empate.',
+    palette: [['Blanco', C.W], ['Negro', C.K], ['Verde', C.G], ['Azul cobalto', C.B], ['Naranja', C.O]],
+    base: C.W,
+    mirror: false,
+    pair: true,
+    art(g, side, dx) {
+      const L = g.L, yb = g.ybc;
+      const field = (c, t, fill) => band(c, -8, t + 8, C.K) + band(c, 0, t, fill) + band(c, t * 0.46, t * 0.46 + 4, C.W);
+      const seam = (cy, r) => `<circle cx="0" cy="${n1(cy)}" r="${r}" fill="none" stroke="${C.K}" stroke-width="14"/>`
+        + `<circle cx="0" cy="${n1(cy)}" r="${r}" fill="none" stroke="${C.W}" stroke-width="4"/>`;
+      // Front: green and blue cross in an X over both tips. Rear: orange behind the heel.
+      const f1 = sCurve(-150, -0.03 * L, 150, 0.13 * L, 0.42);
+      const f2 = sCurve(-150, yb - 520, 150, 0.1 * L, 0.42);
+      const f3 = sCurve(-150, yb + 255, 150, yb + 335, 0.42);
+      return `<g transform="translate(${n1(-dx)} 0)">${seam(yb - 470, 150)}${field(f1, 150, C.G)}${field(f2, 120, C.B)}${field(f3, 80, C.O)}${seam(L + 10, 150)}</g>`;
+    },
+    text(g, s, side) {
+      const words = s.text.trim().split(/\s+/).filter(Boolean);
+      const left = words.length > 1 ? words.slice(0, Math.ceil(words.length / 2)).join(' ') : words.join(' ');
+      const right = words.length > 1 ? words.slice(Math.ceil(words.length / 2)).join(' ') : '';
+      return skiText(g, side === 'L' ? left : right, { fill: C.K }) + specLine(g, s, C.K);
+    },
+  },
+];
+
+/* ================= Ski rendering ================= */
+
+// Pair layout: ski centers sit symmetrically around x = 0.
+const GAP = 16;
+const centerX = (g, side) => (side === 'L' ? -1 : 1) * (g.wmax / 2 + GAP / 2);
+
+function skiArt(v, g, side, s) {
+  let art = v.art(g, side, centerX(g, side));
+  if (v.mirror && side === 'R') art = `<g transform="scale(-1 1)">${art}</g>`;
+  return `<rect x="-90" y="-20" width="180" height="${n1(g.L + 40)}" fill="${v.base}"/>${art}${v.text(g, s, side)}`;
+}
+
+function bindingSVG(g, id) {
+  const y = g.ybc, aw = (yy) => g.hw(yy) - 11;
+  const fy = y - 520, ry = y + 400;
+  const arms = `M0 ${n1(y - 262)}L0 ${n1(y - 340)}M0 ${n1(y - 340)}L${n1(-aw(fy))} ${n1(fy)}M0 ${n1(y - 340)}L${n1(aw(fy))} ${n1(fy)}`
+    + `M-16 ${n1(y + 250)}L0 ${n1(ry)}L16 ${n1(y + 250)}`;
+  const caps = [[-aw(fy), fy], [aw(fy), fy], [0, ry]].map(([x, yy]) => `<circle cx="${n1(x)}" cy="${n1(yy)}" r="6" fill="#B4BCC5" stroke="#1B1E22" stroke-width="2"/>`).join('');
+  return `<g class="binding" filter="url(#${id}-sh)">
+    <path d="${arms}" fill="none" stroke="#1B1E22" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="${arms}" fill="none" stroke="#AEB6BF" stroke-width="6" stroke-linecap="round" stroke-linejoin="round"/>
+    ${caps}
+    <rect x="-27" y="${n1(y - 252)}" width="54" height="494" rx="10" fill="#2A2F35"/>
+    <path d="M-30 ${n1(y + 152)}L${n1(-g.hw(y + 165) - 13)} ${n1(y + 176)}M30 ${n1(y + 152)}L${n1(g.hw(y + 165) + 13)} ${n1(y + 176)}" stroke="#1B1E22" stroke-width="5" stroke-linecap="round"/>
+    <rect x="-33" y="${n1(y - 264)}" width="66" height="108" rx="18" fill="#1E2226"/>
+    <rect x="-21" y="${n1(y - 248)}" width="42" height="40" rx="9" fill="#3B424A"/>
+    <rect x="-14" y="${n1(y - 196)}" width="28" height="5" rx="2.5" fill="${C.O}"/>
+    <rect x="-35" y="${n1(y + 118)}" width="70" height="134" rx="20" fill="#1E2226"/>
+    <rect x="-12" y="${n1(y + 186)}" width="24" height="56" rx="6" fill="#3B424A"/>
+    <rect x="-26" y="${n1(y - 120)}" width="52" height="228" rx="6" fill="#33393F"/>
+  </g>`;
+}
+
+function techSVG(g, id) {
+  const top = g.techTop, bot = g.techBot, w = g.wmax;
+  return `<g class="tech">
+    <rect x="${-w}" y="${n1(top)}" width="${2 * w}" height="${n1(bot - top)}" fill="url(#${id}-hatch)"/>
+    <path d="M${-w} ${n1(top)}H${w}M${-w} ${n1(bot)}H${w}" stroke="var(--tech)" stroke-width="1.5" stroke-dasharray="6 4"/>
+    <path d="M${-w} ${n1(g.ybc)}H${w}" stroke="var(--tech)" stroke-width="1.5"/>
+    <text transform="translate(0 ${n1((top + bot) / 2)}) rotate(-90)" text-anchor="middle" dy="0.35em" font-family="'IBM Plex Mono', monospace" font-weight="500" font-size="11" letter-spacing="1.2" fill="var(--tech)" stroke="${'#FFFFFF'}" stroke-opacity="0.85" stroke-width="3" paint-order="stroke">FIJACIÓN + PROLINK · MEDIR</text>
+  </g>`;
+}
+
+function skiGroup(v, g, side, s, id) {
+  const outline = g.outline(0);
+  return `<clipPath id="${id}-clip"><path d="${outline}"/></clipPath>
+  <g clip-path="url(#${id}-clip)">
+    ${skiArt(v, g, side, s)}
+    ${techSVG(g, id)}
+    <rect x="-70" y="-10" width="140" height="${n1(g.L + 20)}" fill="url(#${id}-gloss)"/>
+  </g>
+  <path d="${outline}" fill="none" stroke="#7D8690" stroke-width="1.1"/>
+  ${bindingSVG(g, id)}`;
+}
+
+function defs(id, grid) {
+  return `<defs>
+    <linearGradient id="${id}-gloss" x1="0" x2="1" y1="0" y2="0">
+      <stop offset="0" stop-color="#fff" stop-opacity="0.22"/>
+      <stop offset="0.32" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="0.72" stop-color="#fff" stop-opacity="0"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0.10"/>
+    </linearGradient>
+    <pattern id="${id}-hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="8" height="8" fill="var(--tech)" fill-opacity="0.14"/>
+      <path d="M0 0V8" stroke="var(--tech)" stroke-width="1.6" stroke-opacity="0.75"/>
+    </pattern>
+    <pattern id="${id}-grid" width="${grid}" height="${grid}" patternUnits="userSpaceOnUse">
+      <path d="M${grid} 0H0V${grid}" fill="none" stroke="#fff" stroke-opacity="${grid > 20 ? 0.09 : 0.06}" stroke-width="${grid > 20 ? 1.2 : 0.4}"/>
+    </pattern>
+    <filter id="${id}-sh" x="-50%" y="-10%" width="200%" height="120%">
+      <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#000" flood-opacity="0.45"/>
+    </filter>
+  </defs>`;
+}
+
+function rulerSVG(g, x) {
+  let out = '';
+  for (let mm = 0; mm <= g.L; mm += 50) {
+    const major = mm % 100 === 0;
+    out += `<path d="M${x} ${mm}h${major ? -12 : -6}" stroke="#fff" stroke-opacity="0.45" stroke-width="1.4"/>`;
+    if (mm % 200 === 0) out += `<text x="${x - 16}" y="${mm}" dy="0.35em" text-anchor="end" font-family="'IBM Plex Mono', monospace" font-size="22" fill="#fff" fill-opacity="0.55">${mm / 10}</text>`;
+  }
+  return `<path d="M${x} 0V${g.L}" stroke="#fff" stroke-opacity="0.3" stroke-width="1.4"/>${out}`;
+}
+
+function pairSVG(v, g, s) {
+  const id = 'p' + v.slug;
+  const cl = centerX(g, 'L'), cr = centerX(g, 'R');
+  const rx = cl - g.wmax / 2 - 14;
+  const x0 = rx - 72, x1 = cr + g.wmax / 2 + 16, y0 = -24, y1 = g.L + 24;
+  return `<svg viewBox="${n1(x0)} ${y0} ${n1(x1 - x0)} ${n1(y1 - y0)}" role="img" aria-label="Par de skis, diseño ${esc(v.name)}">
+    ${defs(id, 100)}
+    <rect x="${n1(x0)}" y="${y0}" width="${n1(x1 - x0)}" height="${n1(y1 - y0)}" fill="url(#${id}-grid)"/>
+    ${rulerSVG(g, rx)}
+    <g transform="translate(${n1(cl)} 0)">${skiGroup(v, g, 'L', s, id + 'L')}</g>
+    <g transform="translate(${n1(cr)} 0)">${skiGroup(v, g, 'R', s, id + 'R')}</g>
+    ${defs(id + 'L', 100)}${defs(id + 'R', 100)}
+  </svg>`;
+}
+
+const CROPS = { tip: 'Punta', mid: 'Centro', tail: 'Cola' };
+
+function detailSVG(v, g, s, crop) {
+  const id = 'd' + v.slug + crop;
+  const span = 560;
+  const ranges = { tip: [-14, span - 14], mid: [g.ybc - span / 2, g.ybc + span / 2], tail: [g.L - span + 14, g.L + 14] };
+  const [y0, y1] = ranges[crop];
+  const half = g.wmax / 2 + 18;
+  const box = `x="${-half}" y="${n1(y0)}" width="${2 * half}" height="${n1(y1 - y0)}"`;
+  return `<svg viewBox="${-half} ${n1(y0)} ${2 * half} ${n1(y1 - y0)}" role="img" aria-label="Detalle ${CROPS[crop].toLowerCase()} del ski derecho">
+    ${defs(id, 10)}
+    <clipPath id="${id}-box"><rect ${box}/></clipPath>
+    <g clip-path="url(#${id}-box)">
+      <rect ${box} fill="url(#${id}-grid)"/>
+      ${skiGroup(v, g, 'R', s, id)}
+    </g>
+  </svg>`;
+}
+
+/* ================= Print export (1:1 mm) ================= */
+
+function exportSVG(i) {
+  const v = VARIANTS[i], s = state, g = geo(s);
+  const bleed = 3, margin = 25, gap = 30, labelH = 18;
+  const w = g.wmax + 2 * bleed;
+  const W = margin * 2 + w * 2 + gap, H = margin * 2 + labelH + g.L + 2 * bleed;
+  const cx = { L: margin + w / 2, R: margin + w + gap + w / 2 }, cy = margin + labelH + bleed;
+  let art = '', cut = '', reg = '', clips = '';
+  for (const side of ['L', 'R']) {
+    const id = 'bleed-' + side;
+    clips += `<clipPath id="${id}"><path d="${g.outline(bleed)}"/></clipPath>`;
+    art += `<g transform="translate(${n1(cx[side])} ${cy})"><g clip-path="url(#${id})">${skiArt(v, g, side, s)}</g></g>`;
+    cut += `<path transform="translate(${n1(cx[side])} ${cy})" fill="none" stroke="#EC008C" stroke-width="0.25" d="${g.outline(0)}"/>`;
+    const bx = g.hw(g.ybc) + bleed + 3;
+    reg += `<g transform="translate(${n1(cx[side])} ${cy})" stroke="#EC008C" stroke-width="0.35" fill="none">
+      <path d="M${n1(-bx)} ${n1(g.ybc)}h-10M${n1(bx)} ${n1(g.ybc)}h10"/>
+    </g>
+    <text x="${n1(cx[side])}" y="${margin + 6}" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="5" fill="#EC008C">${side === 'L' ? 'IZQUIERDO' : 'DERECHO'} · PUNTA ARRIBA ↑</text>`;
+  }
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<!-- Plot Equipe 3V · diseño ${v.name} · ${s.L / 10} cm · ${s.tip}/${s.waist}/${s.tail} mm
+     Escala 1:1, unidades en mm. Capas: Arte (con 3 mm de sangrado), CutContour (línea de corte, magenta),
+     Registro (centro de bota y rótulos; no imprimir). Convierte el texto a contornos antes de imprimir. -->
+<svg xmlns="http://www.w3.org/2000/svg" width="${n1(W)}mm" height="${n1(H)}mm" viewBox="0 0 ${n1(W)} ${n1(H)}">
+  <defs>${clips}</defs>
+  <g id="Arte">${art}</g>
+  <g id="CutContour">${cut}</g>
+  <g id="Registro">${reg}</g>
+</svg>
+`;
+}
+
+/* ================= Panel ================= */
+
+const stageWrap = document.getElementById('stageWrap');
+const info = document.getElementById('variantInfo');
+const chips = document.getElementById('chips');
+
+function renderChips() {
+  chips.innerHTML = [`${state.L / 10} cm`, `${state.tip} / ${state.waist} / ${state.tail} mm`, 'Escala real en mm']
+    .map((t) => `<li>${esc(t)}</li>`).join('');
+}
+
+function renderPanel(i) {
+  const v = VARIANTS[i];
+  info.innerHTML = `
+    <div class="v-head">
+      <p class="eyebrow">Opción ${i + 1} de ${VARIANTS.length}</p>
+      <h2>${esc(v.name)}</h2>
+      <span class="axis">${esc(v.axis)}</span>
+      <p>${esc(v.blurb)}</p>
+    </div>
+    <dl class="trade" style="margin-top:16px">
+      <div><dt>Cuándo gana</dt><dd>${esc(v.when)}</dd></div>
+      <div><dt>Lo que cuesta</dt><dd>${esc(v.cost)}</dd></div>
+    </dl>
+    <div class="block" style="margin-top:20px">
+      <h3>Paleta · toca para copiar</h3>
+      <ul class="swatches">${v.palette.map(([name, hex]) => `
+        <li><button type="button" class="swatch" data-hex="${hex}" aria-label="Copiar ${esc(name)} ${hex}">
+          <span class="chip" style="background:${hex}"></span>
+          <span><b>${esc(name)}</b><small>${hex}</small></span>
+        </button></li>`).join('')}
+      </ul>
+    </div>
+    <div class="block" style="margin-top:20px">
+      <h3>Producción</h3>
+      <p>${esc(v.production)}</p>
+    </div>`;
+}
+
+info.addEventListener('click', async (e) => {
+  const b = e.target.closest('.swatch');
+  if (!b) return;
+  const small = b.querySelector('small'), hex = b.dataset.hex;
+  try { await navigator.clipboard.writeText(hex); small.textContent = 'Copiado'; }
+  catch { small.textContent = hex; const r = document.createRange(); r.selectNodeContents(small); getSelection().removeAllRanges(); getSelection().addRange(r); return; }
+  setTimeout(() => { small.textContent = hex; }, 1200);
+});
+
+/* ================= Stage ================= */
+
+function stageMarkup(i) {
+  const v = VARIANTS[i], g = geo(state);
+  return `<figure class="view">${pairSVG(v, g, state)}<figcaption>Par · ${state.L / 10} cm</figcaption></figure>`
+    + Object.keys(CROPS).map((c) => `<figure class="view detail"${c === state.crop ? ' data-on' : ''}>${detailSVG(v, g, state, c)}<figcaption>${CROPS[c]} · 1 cuadro = 1 cm</figcaption></figure>`).join('');
+}
+
+// One render function per variant, in picker order (the picker wiring below expects this array).
+const variants = VARIANTS.map((_, i) => () => { renderPanel(i); return stageMarkup(i); });
+
+/* ================= Segmented controls ================= */
+
+function segment(el, onChange) {
+  const hl = el.querySelector('.seg-hl');
+  const btns = [...el.querySelectorAll('button')];
+  const place = () => {
+    const on = btns.find((b) => b.getAttribute('aria-pressed') === 'true');
+    hl.style.width = on.offsetWidth + 'px';
+    hl.style.transform = `translateX(${on.offsetLeft - 3}px)`;
+    hl.style.left = '3px';
+  };
+  btns.forEach((b) => b.addEventListener('click', () => {
+    btns.forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    place();
+    onChange(b.dataset.val);
+  }));
+  window.addEventListener('resize', place);
+  place();
+  requestAnimationFrame(() => requestAnimationFrame(() => el.setAttribute('data-ready', '')));
+  return place;
+}
+const placeView = segment(document.getElementById('segView'), (val) => { stageWrap.dataset.view = val; });
+const placeCrop = segment(document.getElementById('segCrop'), (val) => { state.crop = val; rerender(); });
+document.fonts?.ready.then(() => { placeView(); placeCrop(); });
+
+/* ================= Form ================= */
+
+const clamp = (v, lo, hi, d) => (Number.isFinite(v) ? Math.min(hi, Math.max(lo, Math.round(v))) : d);
+document.getElementById('form').addEventListener('input', (e) => {
+  const f = e.currentTarget.elements;
+  state.text = f.text.value;
+  state.L = clamp(parseInt(f.len.value, 10), 1400, 1900, 1650);
+  state.tip = clamp(parseFloat(f.tip.value), 80, 140, 105);
+  state.waist = clamp(parseFloat(f.waist.value), 55, 110, 64);
+  state.tail = clamp(parseFloat(f.tail.value), 70, 135, 94);
+  if (state.waist > Math.min(state.tip, state.tail) - 4) state.waist = Math.min(state.tip, state.tail) - 4;
+  renderChips();
+  rerender();
+});
+document.getElementById('form').addEventListener('submit', (e) => e.preventDefault());
+
+/* ================= Download ================= */
+
+const dlBtn = document.getElementById('dl');
+const dlHint = document.getElementById('dlHint');
+const inViewer = !!(window.claude && window.claude.use);
+const dlReady = inViewer ? window.claude.use('downloads').catch(() => null) : Promise.resolve(undefined);
+dlReady.then((d) => {
+  if (d === null) {
+    dlBtn.hidden = true;
+    dlHint.textContent = 'La descarga no está disponible en esta vista. Los SVG de cada diseño están en la carpeta ski-wrap del repositorio.';
+  }
+});
+function flashLabel(text) {
+  const span = dlBtn.querySelector('span');
+  span.classList.add('swap');
+  setTimeout(() => { span.textContent = text; span.classList.remove('swap'); }, 120);
+  setTimeout(() => { span.classList.add('swap'); setTimeout(() => { span.textContent = 'Descargar SVG para plotter'; span.classList.remove('swap'); }, 120); }, 1800);
+}
+dlBtn.addEventListener('click', async () => {
+  const svg = exportSVG(current);
+  const filename = `equipe3v-${VARIANTS[current].slug}-${state.L / 10}cm.svg`;
+  const d = await dlReady;
+  if (d) {
+    try { await d.save({ filename, data: svg }); flashLabel('Guardado'); }
+    catch (err) { flashLabel(err && err.code === 'declined' ? 'Cancelado' : 'No se pudo guardar'); }
+  } else if (d === undefined) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+    flashLabel('Guardado');
+  }
+});
+
+/* ================= Picker wiring (verbatim from PICKER.md) ================= */
+
+// `variants` is an array of render functions, one per variant, in picker order.
+const stage = document.getElementById('stage');
+const picker = document.querySelector('.proto-picker');
+const highlight = picker.querySelector('.proto-picker-highlight');
+const items = [...picker.querySelectorAll('.proto-picker-item:not(.proto-picker-replay)')];
+const replay = picker.querySelector('.proto-picker-replay');
+let current = 0;
+
+function moveHighlight() {
+  const el = items[current];
+  highlight.style.width = el.offsetWidth + 'px';
+  highlight.style.transform = `translateX(${el.offsetLeft}px)`;
+}
+
+function mount(i) {
+  stage.innerHTML = '';
+  // Clear first, render next frame, so entrance animations re-run.
+  requestAnimationFrame(() => { stage.innerHTML = variants[i](); });
+}
+
+function setActive(i) {
+  if (i < 0 || i >= variants.length) return;
+  current = i;
+  items.forEach((el, j) => {
+    el.toggleAttribute('data-active', j === i);
+    if (j === i) el.setAttribute('aria-current', 'true');
+    else el.removeAttribute('aria-current');
+  });
+  moveHighlight();
+  const url = new URL(location);
+  url.searchParams.set('v', i + 1);
+  history.replaceState(null, '', url);
+  mount(i);
+}
+
+items.forEach((el, i) => el.addEventListener('click', () => setActive(i)));
+replay?.addEventListener('click', () => mount(current));
+window.addEventListener('resize', moveHighlight);
+
+document.addEventListener('keydown', (e) => {
+  if (/^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) || e.target.isContentEditable) return;
+  if (e.metaKey || e.ctrlKey || e.altKey) return;
+  const num = parseInt(e.key, 10);
+  if (num >= 1 && num <= variants.length) setActive(num - 1);
+  else if (e.key === 'ArrowRight') setActive((current + 1) % variants.length);
+  else if (e.key === 'ArrowLeft') setActive((current - 1 + variants.length) % variants.length);
+  else if (e.key === 'r' || e.key === 'R') mount(current);
+});
+
+setActive((parseInt(new URLSearchParams(location.search).get('v'), 10) || 1) - 1);
+// Enable the slide only after first paint, so load doesn't animate.
+requestAnimationFrame(() => requestAnimationFrame(() => picker.setAttribute('data-ready', '')));
+
+// Edits re-render in place, without the picker's clear-then-mount frame, so typing never flickers.
+function rerender() { stage.innerHTML = variants[current](); }
+renderChips();
+</script>
