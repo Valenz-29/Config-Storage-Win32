@@ -22,17 +22,21 @@ static uint16_t ai_color = C_CLAUDE;
 #define C_SEL    rgb(60, 70, 100)
 
 // ------------------------------------------------------------------ pantallas
-enum { S_CHAT, S_CAM, S_CAM_BUSY, S_REVIEW, S_WIFI_LIST, S_WIFI_PASS, S_WIFI_CONN };
+enum { S_CHAT, S_CAM, S_CAM_BUSY, S_REVIEW, S_WIFI_LIST, S_WIFI_PASS, S_WIFI_CONN, S_IMAGE, S_CONFIRM };
 static int screen = S_CHAT;
 
 // ------------------------------------------------------------------ historial del chat
 enum { R_USER, R_AI, R_SYS };
 #define CHAT_CAP 12000
 #define MAXMSG 64
-struct Msg { uint16_t off, len; uint8_t role, photo; };
+struct Msg { uint16_t off, len; uint8_t role; int16_t img; };   // img: id de la imagen adjunta o -1
 static char cbuf[CHAT_CAP]; static int cused = 0;
 static Msg msgs[MAXMSG]; static int nmsg = 0;
 static int scroll = 0;            // líneas desde abajo
+static int sel_msg = -1;          // mensaje elegido con las flechas (-1 = ninguno)
+static bool view_arm = false;     // se apretó Y= con un mensaje con imagen elegido
+static int view_img = -1;         // imagen en pantalla completa
+static int next_img = 0;
 static bool waiting = false;
 static bool photo_attached = false;
 
@@ -42,19 +46,20 @@ static void drop_oldest() {
   m_move(cbuf, cbuf + L, cused - L); cused -= L;
   for (int i = 1; i < nmsg; i++) { msgs[i - 1] = msgs[i]; msgs[i - 1].off -= L; }
   nmsg--;
+  if (sel_msg >= 0) sel_msg--;
 }
 
-static void add_msg(int role, const char* s, int n, bool photo) {
+static void add_msg(int role, const char* s, int n, int img) {
   if (n > CHAT_CAP / 2) n = CHAT_CAP / 2;
   while (nmsg >= MAXMSG || cused + n > CHAT_CAP) drop_oldest();
   m_copy(cbuf + cused, s, n);
   msgs[nmsg].off = (uint16_t)cused; msgs[nmsg].len = (uint16_t)n;
-  msgs[nmsg].role = (uint8_t)role; msgs[nmsg].photo = photo;
+  msgs[nmsg].role = (uint8_t)role; msgs[nmsg].img = (int16_t)img;
   nmsg++; cused += n; scroll = 0; g_dirty = true;
 }
 static void add_sys(const char* utf8) {
   char tmp[256]; int n = utf8_to_local(utf8, s_len(utf8), tmp, sizeof tmp);
-  add_msg(R_SYS, tmp, n, false);
+  add_msg(R_SYS, tmp, n, -1);
 }
 
 // ------------------------------------------------------------------ campos de texto
@@ -159,7 +164,10 @@ static void send_message() {
     const char* d = "¿Qué ves en esta imagen?";
     input.n = utf8_to_local(d, s_len(d), input.b, input.cap);
   }
-  add_msg(R_USER, input.b, input.n, photo_attached);
+  int img = -1;
+  if (photo_attached) { img = next_img++; hal_image_keep(img); }
+  add_msg(R_USER, input.b, input.n, img);
+  sel_msg = -1;
   int n = local_to_utf8(input.b, input.n, g_io, IO_CAP);
   hal_ai_send(g_io, n, photo_attached ? 1 : 0);
   photo_attached = false;
@@ -168,7 +176,7 @@ static void send_message() {
 }
 
 void ai_enter(void) { screen = S_CHAT; k2nd = false; g_dirty = true; }
-void ai_exit(void) { if (screen == S_CAM || screen == S_CAM_BUSY || screen == S_REVIEW) hal_camera_stop(); screen = S_CHAT; }
+void ai_exit(void) { if (screen == S_CAM || screen == S_CAM_BUSY || screen == S_REVIEW) hal_camera_stop(); screen = S_CHAT; view_arm = false; }
 
 bool ai_wants_text(void) { return screen == S_CHAT || screen == S_WIFI_PASS; }
 
@@ -181,15 +189,36 @@ void ai_char(uint8_t c) {
 void ai_key(int k) {
   g_dirty = true; blink = true; blink_t = hal_millis();
   switch (screen) {
-    case S_CHAT:
-      if (k == K_ENTER || k == K_GRAPH) { send_message(); return; }
-      if (k == K_UP) { scroll++; return; }
-      if (k == K_DOWN) { if (scroll) scroll--; return; }
-      if (k == K_YEQU) { if (photo_attached) { photo_attached = false; hal_photo_discard(); } return; }
+    case S_CHAT: {
+      bool armed = view_arm; view_arm = false;
+      bool sel_img = sel_msg >= 0 && sel_msg < nmsg && msgs[sel_msg].img >= 0;
+      if (k == K_ENTER && armed && sel_img) { view_img = msgs[sel_msg].img; screen = S_IMAGE; return; }
+      if (k == K_ENTER || k == K_GRAPH) { sel_msg = -1; send_message(); return; }
+      if (k == K_UP) { if (nmsg) sel_msg = sel_msg < 0 ? nmsg - 1 : (sel_msg > 0 ? sel_msg - 1 : 0); return; }
+      if (k == K_DOWN) { if (sel_msg >= 0 && ++sel_msg >= nmsg) { sel_msg = -1; scroll = 0; } return; }
+      if (k == K_YEQU) {
+        if (sel_img) { view_arm = true; return; }      // Y= + ENTER: ver la imagen del mensaje
+        if (photo_attached) { photo_attached = false; hal_photo_discard(); }
+        return;
+      }
       if (k == K_WINDOW) { go_camera(); return; }
       if (k == K_ZOOM) { go_wifi(); return; }
-      if (k == K_TRACE) { hal_ai_reset(); ai_new_chat(); return; }
+      if (k == K_TRACE) {
+        bool any = false;
+        for (int i = 0; i < nmsg; i++) if (msgs[i].role != R_SYS) any = true;
+        if (any) screen = S_CONFIRM; else { hal_ai_reset(); ai_new_chat(); }
+        return;
+      }
+      if (k == K_CLEAR && sel_msg >= 0 && !input.n) { sel_msg = -1; scroll = 0; return; }
       field_key(input, k);
+      return;
+    }
+    case S_IMAGE:
+      screen = S_CHAT;                                  // cualquier tecla vuelve al chat
+      return;
+    case S_CONFIRM:
+      if (k == K_GRAPH) { screen = S_CHAT; hal_ai_reset(); ai_new_chat(); return; }
+      if (k == K_YEQU || k == K_CLEAR) { screen = S_CHAT; return; }
       return;
     case S_CAM:
       if (k == K_ENTER || k == K_GRAPH) { screen = S_CAM_BUSY; hal_camera_capture(); return; }
@@ -232,11 +261,12 @@ void ai_set_assistant(const char* utf8, int len, uint16_t color) {
 }
 
 void ai_new_chat(void) {
-  nmsg = 0; cused = 0; scroll = 0; waiting = false;
+  nmsg = 0; cused = 0; scroll = 0; waiting = false; sel_msg = -1; view_arm = false;
+  hal_image_clear();
   char m[48] = "Nuevo chat con ";
   s_cpy(m + 15, ai_name, sizeof m - 16);
   int n = s_len(m); m[n] = '.'; m[n + 1] = 0;
-  add_msg(R_SYS, m, n + 1, false);
+  add_msg(R_SYS, m, n + 1, -1);
 }
 
 // Texto del chat para pruebas automáticas: nombre del asistente y mensajes
@@ -248,6 +278,11 @@ int ai_debug_text(char* out, int cap) {
     put(msgs[m].role == R_USER ? "> " : msgs[m].role == R_AI ? "< " : "# ", 2);
     put(cbuf + msgs[m].off, msgs[m].len); put("\n", 1);
   }
+  char st[32] = "#pantalla:0 sel:";
+  st[10] = (char)('0' + screen);
+  int sn = 16; int v = sel_msg; if (v < 0) { st[sn++] = '-'; v = 1; }
+  st[sn++] = (char)('0' + v % 10); st[sn++] = '\n';
+  put(st, sn);
   out[o] = 0;
   return o;
 }
@@ -255,7 +290,7 @@ int ai_debug_text(char* out, int cap) {
 void ai_on_reply(int len, int ok) {
   char* tmp = g_io;  // se convierte en el mismo buffer (la salida nunca es más larga)
   int n = utf8_to_local(g_io, len, tmp, IO_CAP);
-  add_msg(ok ? R_AI : R_SYS, tmp, n, false);
+  add_msg(ok ? R_AI : R_SYS, tmp, n, -1);
   waiting = false;
 }
 
@@ -294,7 +329,7 @@ void ai_on_wifi_result(int ok) {
     if (screen == S_WIFI_CONN) {
       char m[80] = "Conectado a ";
       s_cpy(m + 12, wifi_name, 60);
-      add_msg(R_SYS, m, s_len(m), false);
+      add_msg(R_SYS, m, s_len(m), -1);
       screen = S_CHAT;
     }
   } else {
@@ -360,12 +395,12 @@ static void softkeys(const char* a, const char* b, const char* c, const char* d,
 // --- chat
 #define CHAT_COLS 52
 #define MAXLINES 600
-struct Line { uint16_t off; uint8_t len, kind; };
-enum { L_HUSER, L_HAI, L_USER, L_AI, L_SYS, L_PHOTO, L_BLANK, L_WAIT };
-static Line lines[MAXLINES]; static int nl;
+struct Line { uint16_t off; uint8_t len, kind; int16_t msg; };
+enum { L_HUSER, L_HAI, L_USER, L_AI, L_SYS, L_PHOTO, L_PHOTO2, L_BLANK, L_WAIT };
+static Line lines[MAXLINES]; static int nl, cur_msg;
 
 static void push_line(int off, int len, int kind) {
-  if (nl < MAXLINES) { lines[nl].off = (uint16_t)off; lines[nl].len = (uint8_t)len; lines[nl].kind = (uint8_t)kind; nl++; }
+  if (nl < MAXLINES) { lines[nl].off = (uint16_t)off; lines[nl].len = (uint8_t)len; lines[nl].kind = (uint8_t)kind; lines[nl].msg = (int16_t)cur_msg; nl++; }
 }
 
 static void wrap(int off, int len, int kind, int cols) {
@@ -384,12 +419,15 @@ static void build_lines() {
   nl = 0;
   for (int m = 0; m < nmsg; m++) {
     Msg& g = msgs[m];
+    cur_msg = m;
     if (g.role == R_USER) push_line(0, 0, L_HUSER);
     if (g.role == R_AI) push_line(0, 0, L_HAI);
-    if (g.photo) push_line(0, 0, L_PHOTO);
+    if (g.img >= 0) { push_line(0, 0, L_PHOTO); push_line(0, 0, L_PHOTO2); push_line(0, 0, L_PHOTO2); }
     wrap(g.off, g.len, g.role == R_USER ? L_USER : g.role == R_AI ? L_AI : L_SYS, CHAT_COLS);
+    cur_msg = -1;
     push_line(0, 0, L_BLANK);
   }
+  cur_msg = -1;
   if (waiting) { push_line(0, 0, L_HAI); push_line(0, 0, L_WAIT); }
 }
 
@@ -419,6 +457,17 @@ static void draw_chat() {
   build_lines();
   int top = 15, vis = (in_top - 2 - top) / CH_H;
   int max_scroll = nl - vis; if (max_scroll < 0) max_scroll = 0;
+  if (sel_msg >= 0) {                                  // que se vea el mensaje elegido
+    int fl = -1, ll = -1;
+    for (int i = 0; i < nl; i++) if (lines[i].msg == sel_msg) { if (fl < 0) fl = i; ll = i; }
+    if (fl >= 0) {
+      int st = nl - vis - scroll;
+      if (ll >= st + vis) st = ll - vis + 1;
+      if (fl < st) st = fl;
+      scroll = nl - vis - st;
+      if (scroll < 0) scroll = 0;
+    }
+  }
   if (scroll > max_scroll) scroll = max_scroll;
   int start = nl - vis - scroll; if (start < 0) start = 0;
   if (!nmsg && !waiting) {
@@ -428,13 +477,24 @@ static void draw_chat() {
                         "ON: volver a la calculadora normal" };
     for (int i = 0; i < 6; i++) { char t[80]; utf8_to_local(h[i], s_len(h[i]), t, sizeof t); gfx_str(4, top + i * CH_H, t, i ? C_DIM : ai_color); }
   }
+  for (int i = 0; i < vis && start + i < nl; i++) {      // primero el fondo del mensaje elegido
+    Line& l = lines[start + i];
+    if (sel_msg >= 0 && l.msg == sel_msg && l.kind != L_BLANK) {
+      gfx_fill(0, top + i * CH_H - 1, SCR_W, CH_H, rgb(34, 40, 60));
+      gfx_fill(1, top + i * CH_H - 1, 2, CH_H, ai_color);
+    }
+  }
   for (int i = 0; i < vis && start + i < nl; i++) {
     Line& l = lines[start + i];
     int ly = top + i * CH_H;
     switch (l.kind) {
       case L_HUSER: gfx_str(4, ly, "T\xFA:", C_USER); break;
       case L_HAI: { int w = gfx_str(4, ly, ai_name, ai_color); gfx_char(4 + w, ly, ':', ai_color); break; }
-      case L_PHOTO: gfx_char(10, ly, CH_CAM, C_USER); gfx_str(18, ly, "foto", C_USER); break;
+      case L_PHOTO:
+        if (!hal_image_draw(msgs[l.msg].img, g_fb, SCR_W, 10, ly, 48, 34)) { gfx_char(10, ly, CH_CAM, C_USER); gfx_str(18, ly, "foto", C_USER); }
+        else if (l.msg == sel_msg) { char t[40]; utf8_to_local("Y= + ENTER: ver grande", 22, t, sizeof t); gfx_str(64, ly + 11, t, C_DIM); }
+        break;
+      case L_PHOTO2: break;
       case L_WAIT: { char t[20] = "pensando"; int n = 8; for (int d = 0; d < dots; d++) t[n++] = '.'; gfx_text(10, ly, t, n, C_DIM); break; }
       case L_BLANK: break;
       default:
@@ -442,7 +502,8 @@ static void draw_chat() {
     }
   }
   if (scroll) gfx_str(SCR_W - 4 - 6 * CH_W, in_top - CH_H - 1, "\x87 m\xE1s", C_DIM);
-  softkeys(photo_attached ? "Quitar" : "", "Foto", "WiFi", "Nuevo", "Enviar");
+  bool sel_img = sel_msg >= 0 && sel_msg < nmsg && msgs[sel_msg].img >= 0;
+  softkeys(sel_img ? "Ver(+ENT)" : photo_attached ? "Quitar" : "", "Foto", "WiFi", "Nuevo", "Enviar");
 }
 
 static void draw_camera() {
@@ -510,8 +571,35 @@ static void draw_wifi() {
   softkeys("Volver", show_pass ? "Ocultar" : "Ver", "", "", "Conectar");
 }
 
+static void draw_image() {
+  gfx_fill(0, 0, SCR_W, SCR_H, 0);
+  if (!hal_image_draw(view_img, g_fb, SCR_W, 0, 0, SCR_W, SCR_H)) {
+    char t[40]; utf8_to_local("La imagen ya no está disponible.", 32, t, sizeof t);
+    gfx_str(20, 110, t, C_TEXT);
+  }
+}
+
+static void draw_confirm() {
+  gfx_fill(0, 0, SCR_W, SCR_H, C_BG);
+  draw_chat();
+  for (int y = 0; y < 228; y++) for (int x = (y & 1); x < SCR_W; x += 2) g_fb[y * SCR_W + x] = 0;   // oscurecer
+  int bx = 40, by = 76, bw = 240, bh = 76;
+  gfx_fill(bx, by, bw, bh, C_BAR);
+  gfx_fill(bx, by, bw, 2, C_WARN);
+  const char* l1 = "¿Borrar el chat actual?";
+  const char* l2 = "Se perderán todos los mensajes.";
+  const char* l3 = "F5: Sí, borrar    F1: No";
+  char t[60]; int n;
+  n = utf8_to_local(l1, s_len(l1), t, sizeof t); gfx_text(bx + (bw - n * CH_W) / 2, by + 12, t, n, C_TEXT);
+  n = utf8_to_local(l2, s_len(l2), t, sizeof t); gfx_text(bx + (bw - n * CH_W) / 2, by + 32, t, n, C_DIM);
+  n = utf8_to_local(l3, s_len(l3), t, sizeof t); gfx_text(bx + (bw - n * CH_W) / 2, by + 54, t, n, C_WARN);
+  softkeys("No", "", "", "", "Sí, borrar");
+}
+
 void ai_draw(void) {
   switch (screen) {
+    case S_IMAGE: draw_image(); break;
+    case S_CONFIRM: draw_confirm(); break;
     case S_CHAT: gfx_fill(0, 0, SCR_W, SCR_H, C_BG); draw_chat(); break;
     case S_CAM: case S_CAM_BUSY: case S_REVIEW: draw_camera(); break;
     default: draw_wifi();

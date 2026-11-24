@@ -21,6 +21,10 @@ void hal_camera_capture(void);           // asíncrono -> core_on_photo(ok)
 // Dibuja la última foto sacada (escalada) en el framebuffer. 1 si había foto.
 int  hal_photo_draw(uint16_t* fb, int stride, int x, int y, int w, int h);
 void hal_photo_discard(void);
+// Imágenes del chat: la plataforma guarda la última foto con un id para mostrarla después
+void hal_image_keep(int id);
+int  hal_image_draw(int id, uint16_t* fb, int stride, int x, int y, int w, int h);  // 1 si existe
+void hal_image_clear(void);
 
 // --- Agente IA ------------------------------------------------------------
 // Envía un mensaje (UTF-8) al agente; si with_photo, adjunta la última foto.

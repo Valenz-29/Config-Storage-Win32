@@ -17,7 +17,8 @@ let now = 0;
 const hal = {
   hal_millis: () => now,
   hal_camera_start() {}, hal_camera_stop() {}, hal_camera_preview: () => 0, hal_camera_brightness() {},
-  hal_camera_capture() {}, hal_photo_draw: () => 0, hal_photo_discard() {}, hal_ai_send() {}, hal_ai_reset() {},
+  hal_camera_capture() {}, hal_photo_draw: () => 0, hal_photo_discard() {},
+  hal_image_keep() {}, hal_image_draw: () => 0, hal_image_clear() {}, hal_ai_send() {}, hal_ai_reset() {},
   hal_wifi_scan() {}, hal_wifi_connect() {},
   m_sin: Math.sin, m_cos: Math.cos, m_tan: Math.tan, m_asin: Math.asin, m_acos: Math.acos, m_atan: Math.atan,
   m_log: Math.log, m_log10: Math.log10, m_exp: Math.exp, m_pow: Math.pow, m_sqrt: Math.sqrt,

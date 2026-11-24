@@ -165,6 +165,36 @@ function realCall(url, headers, body) {
   await type("y"); await keys("ENTER"); await page.waitForTimeout(600);
   check("cada mensaje hace una sola solicitud (salvo reintentos)", sent.length === 7, "solicitudes: " + sent.length);
 
+  // 7b. elegir mensajes con las flechas, ver la foto en grande (Y= + ENTER) y confirmar "Nuevo"
+  {
+    let c = await chatText();
+    const msgsTxt = c.split("\n").slice(1).filter((l) => /^[<>#] /.test(l));
+    const idx = msgsTxt.findIndex((l) => l === "> resuelve");
+    check("el mensaje con foto está en el chat", idx >= 0, c);
+    for (let i = 0; i < msgsTxt.length - idx; i++) await keys("UP");
+    c = await chatText();
+    check("las flechas eligen el mensaje con foto", c.includes("sel:" + idx), c.slice(-40));
+    if (process.env.SHOT_DIR) await page.locator("#screen").screenshot({ path: process.env.SHOT_DIR + "/sel.png" });
+    await keys("YEQU ENTER");
+    c = await chatText();
+    check("Y= + ENTER abre la foto en pantalla completa", c.includes("#pantalla:7"), c.slice(-40));
+    if (process.env.SHOT_DIR) await page.locator("#screen").screenshot({ path: process.env.SHOT_DIR + "/full_img.png" });
+    await keys("CLEAR");
+    c = await chatText();
+    check("cualquier tecla vuelve al chat", c.includes("#pantalla:0"));
+    await keys("DOWN DOWN DOWN DOWN DOWN DOWN DOWN DOWN");
+    await keys("TRACE");
+    c = await chatText();
+    check("Nuevo pide confirmación", c.includes("#pantalla:8"));
+    if (process.env.SHOT_DIR) await page.locator("#screen").screenshot({ path: process.env.SHOT_DIR + "/confirm.png" });
+    await keys("YEQU");
+    c = await chatText();
+    check("No conserva el chat", c.includes("#pantalla:0") && c.includes("> resuelve"));
+    await keys("TRACE GRAPH");
+    c = await chatText();
+    check("Sí borra el chat", c.includes("Nuevo chat con") && !c.includes("> resuelve"), c);
+  }
+
   // 8. Gemini: cambiar de asistente, key inválida real, elegir modelo, reintentos y formato
   await page.selectOption("#provider", "gemini");
   await page.waitForTimeout(150);
