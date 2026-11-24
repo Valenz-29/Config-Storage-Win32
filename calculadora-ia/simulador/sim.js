@@ -93,6 +93,7 @@ function sized(w, h) { scratch.width = w; scratch.height = h; return scratch; }
 // ------------------------------------------------------------------ cámara
 let stream = null, camLevel = 0, camFallback = null;
 let photoCanvas = null, photoB64 = null;
+const chatImages = new Map();
 
 function fakeCameraImage() {               // si no hay cámara: una "hoja de ejercicio" de prueba
   if (camFallback) return camFallback;
@@ -540,6 +541,22 @@ const hal = {
     return 1;
   },
   hal_photo_discard() { photoCanvas = null; photoB64 = null; },
+
+  // Imágenes del chat (fotos ya enviadas), para verlas después en pantalla completa
+  hal_image_keep(id) { if (photoCanvas) chatImages.set(id, photoCanvas); },
+  hal_image_draw(id, fb, stride, x, y, w, h) {
+    const img = chatImages.get(id); if (!img) return 0;
+    const c = sized(w, h);
+    if (w >= 300) {                                   // pantalla completa: la foto entera, sin recortar
+      const g = c.getContext("2d", { willReadFrequently: true });
+      g.fillStyle = "#000"; g.fillRect(0, 0, w, h);
+      const s = Math.min(w / img.width, h / img.height), dw = img.width * s, dh = img.height * s;
+      g.drawImage(img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+    } else drawCover(c, img, img.width, img.height);
+    blitToFB(fb, stride, x, y, c, w, h);
+    return 1;
+  },
+  hal_image_clear() { chatImages.clear(); },
 
   hal_ai_send(ptr, len, withPhoto) {
     const text = readUTF8(ptr, len);
