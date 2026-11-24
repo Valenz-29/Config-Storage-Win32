@@ -360,11 +360,11 @@ async function testGemini(key) {
 // NVIDIA no permite llamadas desde páginas web (CORS), así que en el navegador se usa tu
 // relevo (tools/nvidia-relay). La calculadora real se conecta directo, sin relevo.
 let nvidiaHistory = [];
-let localRelay = "";       // si el simulador se abrió con "Abrir simulador local.bat", el relevo viene incluido
+let localRelay = "";       // relevo incluido: Cloudflare Pages o "Abrir simulador local.bat"
 const nvidiaRelay = () => (store.get("nvidia_relay") || "").trim().replace(/\/+$/, "") || localRelay;
 
 async function detectLocalRelay() {
-  if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) return;
+  if (/github\.io$/.test(location.hostname)) return;   // GitHub Pages no tiene relevo (Cloudflare y el servidor local sí)
   try {
     const r = await fetch("/nvidia/health", { cache: "no-store" });
     if (r.ok && (await r.json()).ok) localRelay = location.origin + "/nvidia";
@@ -708,9 +708,9 @@ function setupPanel() {
   const relay = document.getElementById("relay");
   relay.value = store.get("nvidia_relay") || "";
   if (localRelay) {
-    relay.placeholder = "Relevo local activo ✓ (no necesitas Cloudflare)";
+    relay.placeholder = "Relevo incluido ✓ (no necesitas configurar nada)";
     document.getElementById("relaynote").textContent =
-      "Estás usando el simulador local: el relevo de NVIDIA ya viene incluido. Deja este campo vacío.";
+      "Esta versión del simulador ya trae el relevo de NVIDIA incluido. Deja este campo vacío.";
   }
   relay.addEventListener("change", () => { store.set("nvidia_relay", relay.value.trim() || null); });
   applyProvider(false);
