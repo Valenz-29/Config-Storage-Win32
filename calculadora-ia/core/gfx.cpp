@@ -79,8 +79,17 @@ uint8_t unicode_to_local(uint32_t cp) {
     case 0x2026: return '.';
     case 0x2022: return 0xB7;  // ·
     case 0x2248: return '~';
-    case 0x2264: return '<';
-    case 0x2265: return '>';
+    case 0x2264: return CH_LE;
+    case 0x2265: return CH_GE;
+    case 0x2260: return CH_NE;
+    case 0x0394: return CH_DELTA;
+    case 0x03C7: return CH_CHI;
+    case 0x222B: return CH_INTEG;
+    case 0x2193: return CH_DOWN;
+    case 0x2191: return CH_UP;
+    case 0x25BA: case 0x25B6: return CH_CONV;
+    case 0x25B8: return CH_TRI;
+    case 0x207B: return '-';
     case 0x22C5: return 0xB7;
     case 0x200B: case 0xFE0F: case 0x200D: return 0;  // invisibles
   }
@@ -120,6 +129,17 @@ static uint32_t local_to_unicode(uint8_t c) {
     case CH_NEG: return '-';
     case CH_UP: return 0x2191;
     case CH_THETA: return 0x03B8;
+    case CH_NE: return 0x2260;
+    case CH_LE: return 0x2264;
+    case CH_GE: return 0x2265;
+    case CH_CONV: return 0x25BA;
+    case CH_SUPX: return 0x02E3;
+    case CH_DELTA: return 0x0394;
+    case CH_CHI: return 0x03C7;
+    case CH_INTEG: return 0x222B;
+    case CH_SUPR: return 0x02B3;
+    case CH_DOWN: return 0x2193;
+    case CH_TRI: return 0x25B8;
   }
   return c;
 }

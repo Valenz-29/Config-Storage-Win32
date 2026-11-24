@@ -20,6 +20,17 @@
 #define CH_NEG   0x86  // signo negativo de la TI
 #define CH_UP    0x87  // ↑ (cursor de 2nd)
 #define CH_THETA 0x88  // θ
+#define CH_NE    0x89  // ≠
+#define CH_LE    0x8A  // ≤
+#define CH_GE    0x8B  // ≥
+#define CH_CONV  0x8C  // ► (conversiones: ►Frac, ►DMS)
+#define CH_SUPX  0x8D  // ˣ (para ˣ√)
+#define CH_DELTA 0x8E  // Δ
+#define CH_CHI   0x8F  // χ
+#define CH_INTEG 0x90  // ∫
+#define CH_SUPR  0x91  // ʳ (radianes)
+#define CH_DOWN  0x92  // ↓ (menús con más opciones)
+#define CH_TRI   0x93  // ▸
 
 extern uint16_t g_fb[SCR_W * SCR_H];
 extern bool g_dirty;    // hay que redibujar la pantalla completa

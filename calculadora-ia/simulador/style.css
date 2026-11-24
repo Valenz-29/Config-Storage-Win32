@@ -91,3 +91,9 @@ kbd { background: #2a2e39; border: 1px solid #3a3f4d; border-bottom-width: 2px; 
   .calc { width: 100%; padding: 10px 10px 22px; }
   .keypad { gap: 14px 6px; }
 }
+
+.panel button.secondary { background: #3a3f4d; }
+.panel button:disabled { opacity: .6; }
+.panel input#quick { margin-top: 2px; }
+.offscreen { position: fixed; left: 0; top: 0; width: 2px; height: 2px; opacity: 0; pointer-events: none; }
+.help { margin-top: 12px; }

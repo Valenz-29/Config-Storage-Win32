@@ -115,57 +115,264 @@ function cameraSource() {
 }
 const brightness = () => `brightness(${1 + camLevel * 0.25})`;
 
-// ------------------------------------------------------------------ WiFi simulado
-const NETS = [["Casa_Jose", -48, 1], ["Vecino_5G", -71, 1], ["Cafe_Libre", -80, 0], ["Familia_Perez", -63, 1]];
+// ------------------------------------------------------------------ WiFi
+// El navegador no puede elegir redes WiFi: el simulador usa la conexión real de tu
+// celular o computador. La "Red de prueba" sirve para practicar la pantalla de contraseña
+// (en la calculadora real esa pantalla conecta la XIAO a tu WiFi).
+const REAL_NET = "Este equipo (real)";
+const TEST_NET = "Red de prueba";
 let wifiTimer = null;
+const online = () => navigator.onLine !== false;
 
-// ------------------------------------------------------------------ Claude
-let history = [];   // mensajes de la API (la conversación)
+// ------------------------------------------------------------------ asistentes: Claude o Gemini
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const rgb565 = (r, g, b) => ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | (b >> 3);
+const PROVIDERS = {
+  claude: {
+    name: "Claude", color: rgb565(217, 119, 87), keyStore: "apikey", keyHint: "sk-ant-...",
+    note: "Consigue tu key en console.anthropic.com (necesita crédito, desde USD 5). Se guarda solo en este navegador y se envía únicamente a api.anthropic.com.",
+  },
+  gemini: {
+    name: "Gemini", color: rgb565(138, 180, 248), keyStore: "apikey_gemini", keyHint: "AIza...",
+    note: "Consigue tu key gratis en aistudio.google.com. En el plan gratis, Google puede usar lo que envías (y personas pueden revisarlo) para mejorar sus productos: no mandes datos personales. La key se guarda solo en este navegador y se envía únicamente a generativelanguage.googleapis.com.",
+  },
+};
+const CLAUDE_MODELS = [["claude-opus-5-5", "Claude Opus 5.5 (el más capaz)"], ["claude-sonnet-5-5", "Claude Sonnet 5.5"],
+  ["claude-haiku-5-5", "Claude Haiku 5.5 (el más barato)"]];
+let provider = store.get("provider") === "gemini" ? "gemini" : "claude";
+const currentModel = () => document.getElementById("model").value;
 
-async function askClaude(text, withPhoto) {
-  const key = store.get("apikey");
-  if (!key) return [false, "Falta la API key. Pégala en el panel del simulador (1. Configura Claude)."];
-  const model = document.getElementById("model").value;
-  const content = [];
-  if (withPhoto && photoB64) content.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: photoB64 } });
-  content.push({ type: "text", text });
-  history.push({ role: "user", content });
+// Solicitud con reintentos (saturación, límites cortos, fallas de red) y tiempo límite.
+// retryable(respuesta, intento) devuelve cuántos ms esperar, o null para no reintentar.
+async function request(method, url, headers, body, timeoutMs, retryable) {
+  let last = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { method, headers, body: body ? JSON.stringify(body) : undefined, signal: ctrl.signal });
+      clearTimeout(timer);
+      const data = await res.json().catch(() => ({}));
+      last = { status: res.status, data, headers: res.headers };
+      const wait = res.ok ? null : retryable(last, attempt);
+      if (wait == null || attempt === 2) return last;
+      await sleep(wait);
+    } catch (e) {
+      clearTimeout(timer);
+      last = { status: 0, timeout: e.name === "AbortError", data: {} };
+      if (attempt === 2 || last.timeout) return last;
+      await sleep(1500 * (attempt + 1));
+    }
+  }
+  return last;
+}
 
-  const body = {
-    model,
-    max_tokens: 4096,
-    system: cString(core.core_system_prompt()),
-    messages: history,
-    output_config: { effort: "low" },
-  };
-  const headers = {
+// ------------------------------------------------------------------ Claude (API de Anthropic)
+const ANTHROPIC = "https://api.anthropic.com/v1";
+let claudeHistory = [];   // la conversación (se manda completa en cada mensaje)
+
+function claudeHeaders(key, model) {
+  const h = {
     "content-type": "application/json",
     "x-api-key": key,
     "anthropic-version": "2026-10-21",
     "anthropic-dangerous-direct-browser-access": "true",
   };
-  if (model !== "claude-haiku-5-5") {      // si un filtro de seguridad rechaza, reintenta con otro modelo
-    body.fallbacks = "default";
-    headers["anthropic-beta"] = "server-side-fallback-2026-07-01";
+  if (model && model !== "claude-haiku-5-5") h["anthropic-beta"] = "server-side-fallback-2026-07-01";
+  return h;
+}
+
+function claudeRetry(r, attempt) {
+  if (r.status !== 429 && r.status !== 529 && r.status < 500) return null;
+  const after = parseFloat(r.headers && r.headers.get("retry-after"));
+  return Math.min(isFinite(after) ? after * 1000 : 1500 * (attempt + 1), 10000);
+}
+
+function claudeError(r, model) {
+  const msg = (r.data && r.data.error && r.data.error.message) || "";
+  if (r.timeout) return "Claude tardó demasiado en responder. Intenta de nuevo.";
+  if (r.status === 0) return online() ? "No se pudo conectar con la API de Claude." : "Sin internet. Revisa tu conexión.";
+  if (r.status === 400 && /credit/i.test(msg)) return "No tienes crédito en la API. Recarga en console.anthropic.com.";
+  if (r.status === 401) return "API key inválida. Revísala en el panel del simulador.";
+  if (r.status === 403) return "Tu API key no tiene permiso para usar " + model + ".";
+  if (r.status === 404) return "El modelo " + model + " no está disponible para tu cuenta.";
+  if (r.status === 413) return "La foto es demasiado grande. Intenta de nuevo.";
+  if (r.status === 429) return "Demasiadas solicitudes seguidas. Espera un momento.";
+  if (r.status === 529 || r.status >= 500) return "Claude está saturado ahora. Intenta en un rato.";
+  return "Error " + r.status + (msg ? ": " + msg.slice(0, 160) : "");
+}
+
+async function askClaude(text, withPhoto, key, model) {
+  const content = [];
+  const hasPhoto = withPhoto && photoB64;
+  if (hasPhoto) content.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: photoB64 } });
+  content.push({ type: "text", text });
+  claudeHistory.push({ role: "user", content });
+  const body = {
+    model,
+    max_tokens: 16000,
+    system: cString(core.core_system_prompt()),
+    messages: claudeHistory,
+    output_config: { effort: hasPhoto ? "medium" : "low" },   // con foto piensa un poco más
+    cache_control: { type: "ephemeral" },                     // abarata los chats largos y con fotos
+  };
+  if (model !== "claude-haiku-5-5") body.fallbacks = "default";
+  const r = await request("POST", ANTHROPIC + "/messages", claudeHeaders(key, model), body, 90000, claudeRetry);
+  if (r.status !== 200) { claudeHistory.pop(); return [false, claudeError(r, model)]; }
+  const data = r.data;
+  if (data.stop_reason === "refusal") { claudeHistory.pop(); return [false, "Claude no puede responder eso."]; }
+  claudeHistory.push({ role: "assistant", content: data.content });
+  let out = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
+  if (data.stop_reason === "max_tokens") out += " (respuesta cortada)";
+  return [true, out || "(sin respuesta)"];
+}
+
+// Comprueba la key sin gastar crédito (contar tokens es gratis)
+async function testClaude(key, model) {
+  const r = await request("POST", ANTHROPIC + "/messages/count_tokens",
+    { model, messages: [{ role: "user", content: "hola" }] }, claudeHeaders(key, null), 20000, claudeRetry);
+  if (r.status === 200) return [true, "La key funciona con " + model + ". ✓"];
+  return [false, claudeError(r, model)];
+}
+
+// ------------------------------------------------------------------ Gemini (API de Google)
+const GOOGLE = "https://generativelanguage.googleapis.com/v1beta";
+let geminiHistory = [];
+const geminiHeaders = (key) => ({ "content-type": "application/json", "x-goog-api-key": key });
+
+function geminiDetail(r, type) {
+  const d = r.data && r.data.error && r.data.error.details;
+  return Array.isArray(d) ? d.find((x) => String(x["@type"] || "").endsWith(type)) : null;
+}
+
+function geminiRetry(r, attempt) {
+  if (r.status === 500 || r.status === 503 || r.status === 504) return 1500 * (attempt + 1);
+  if (r.status === 429) {                    // solo si Google dice que basta esperar unos segundos
+    const info = geminiDetail(r, "RetryInfo");
+    const s = info ? parseFloat(info.retryDelay) : NaN;
+    return isFinite(s) && s <= 10 ? s * 1000 + 300 : null;
   }
-  try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers, body: JSON.stringify(body) });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      history.pop();
-      const msg = data && data.error && data.error.message ? data.error.message : res.statusText;
-      if (res.status === 401) return [false, "API key inválida. Revísala en el panel del simulador."];
-      if (res.status === 429) return [false, "Demasiadas solicitudes o sin crédito. Espera un momento."];
-      return [false, `Error ${res.status}: ${msg}`];
+  return null;
+}
+
+function geminiError(r, model) {
+  const msg = (r.data && r.data.error && r.data.error.message) || "";
+  const info = geminiDetail(r, "ErrorInfo");
+  if (r.timeout) return "Gemini tardó demasiado en responder. Intenta de nuevo.";
+  if (r.status === 0) return online() ? "No se pudo conectar con la API de Gemini." : "Sin internet. Revisa tu conexión.";
+  if ((info && info.reason === "API_KEY_INVALID") || /API key not valid/i.test(msg)) return "API key de Gemini inválida. Revísala en el panel del simulador.";
+  if (/location is not supported/i.test(msg)) return "Gemini no está disponible en tu país con esta cuenta.";
+  if (r.status === 403) return "Tu key de Gemini no tiene permiso. Revisa que la API esté activada en tu cuenta de Google.";
+  if (r.status === 404) return "El modelo " + model + " no está disponible.";
+  if (r.status === 429) return "Llegaste al límite de uso de Gemini por ahora (el plan gratis tiene límites). Espera un rato.";
+  if (r.status >= 500) return "Gemini está saturado ahora. Intenta en un rato.";
+  return "Error " + r.status + (msg ? ": " + msg.slice(0, 160) : "");
+}
+
+// Los modelos de Gemini cambian seguido, así que se le pregunta a Google cuáles hay.
+// Se prefiere el "flash" estable más nuevo (rápido y con plan gratis).
+const GEMINI_SKIP = /embedding|tts|image|imagen|veo|live|audio|robotics|computer-use|aqa/i;
+function geminiRank(id) {
+  const v = parseFloat((id.match(/gemini-(\d+(?:\.\d+)?)/) || [])[1] || "0");
+  return [/preview|exp/i.test(id) ? 1 : 0, /flash/i.test(id) ? 0 : 1, /lite/i.test(id) ? 1 : 0, -v];
+}
+function compareModels(a, b) {
+  const x = geminiRank(a.id), y = geminiRank(b.id);
+  for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i] - y[i];
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+}
+async function geminiModels(key) {
+  const list = [];
+  let token = "";
+  for (let page = 0; page < 3; page++) {
+    const url = GOOGLE + "/models?pageSize=100" + (token ? "&pageToken=" + encodeURIComponent(token) : "");
+    const r = await request("GET", url, geminiHeaders(key), null, 20000, geminiRetry);
+    if (r.status !== 200) return { error: geminiError(r, "") };
+    for (const m of r.data.models || []) {
+      const id = String(m.name || "").replace(/^models\//, "");
+      if (!/gemini/i.test(id) || GEMINI_SKIP.test(id)) continue;
+      if (!(m.supportedGenerationMethods || []).includes("generateContent")) continue;
+      list.push({ id, label: m.displayName || id });
     }
-    if (data.stop_reason === "refusal") { history.pop(); return [false, "Claude no puede responder eso."]; }
-    history.push({ role: "assistant", content: data.content });
-    const out = data.content.filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
-    return [true, out || "(sin respuesta)"];
-  } catch (e) {
-    history.pop();
-    return [false, "Sin conexión con la API: " + e.message];
+    token = r.data.nextPageToken;
+    if (!token) break;
   }
+  if (!list.length) return { error: "Tu key no tiene modelos de Gemini disponibles." };
+  list.sort(compareModels);
+  store.set("gemini_models", JSON.stringify(list));
+  return { list };
+}
+
+async function askGemini(text, withPhoto, key) {
+  let model = currentModel();
+  if (!model || model === "auto") {
+    const m = await geminiModels(key);
+    if (m.error) return [false, m.error];
+    fillModels();
+    model = m.list[0].id;
+  }
+  const parts = [];
+  if (withPhoto && photoB64) parts.push({ inlineData: { mimeType: "image/jpeg", data: photoB64 } });
+  parts.push({ text });
+  geminiHistory.push({ role: "user", parts });
+  const body = {
+    systemInstruction: { parts: [{ text: cString(core.core_system_prompt()) }] },
+    contents: geminiHistory,
+    generationConfig: { maxOutputTokens: 8192 },
+  };
+  const send = (m) => request("POST", GOOGLE + "/models/" + encodeURIComponent(m) + ":generateContent",
+    geminiHeaders(key), body, 90000, geminiRetry);
+  let r = await send(model);
+  if (r.status === 404) {                    // el modelo ya no existe: elegir otro y reintentar
+    const m = await geminiModels(key);
+    if (!m.error && m.list[0].id !== model) { model = m.list[0].id; fillModels(model); r = await send(model); }
+  }
+  if (r.status !== 200) { geminiHistory.pop(); return [false, geminiError(r, model)]; }
+  const data = r.data, cand = (data.candidates || [])[0];
+  const out = cand && cand.content && cand.content.parts;
+  if (!out || !out.length) {
+    geminiHistory.pop();
+    const blocked = (data.promptFeedback && data.promptFeedback.blockReason) ||
+      (cand && /SAFETY|PROHIBITED|BLOCKLIST|SPII|RECITATION/.test(cand.finishReason || ""));
+    return [false, blocked ? "Gemini no puede responder eso." : "Gemini no respondió nada. Intenta de nuevo."];
+  }
+  geminiHistory.push(Object.assign({}, cand.content, { role: "model" }));   // tal cual, con sus firmas
+  let txt = out.filter((p) => typeof p.text === "string" && !p.thought).map((p) => p.text).join("").trim();
+  if (cand.finishReason === "MAX_TOKENS") txt += " (respuesta cortada)";
+  return [true, txt || "(sin respuesta)"];
+}
+
+// Comprueba la key sin gastar cuota (listar modelos es gratis) y elige el modelo
+async function testGemini(key) {
+  const m = await geminiModels(key);
+  if (m.error) return [false, m.error];
+  fillModels();
+  return [true, "La key funciona. Modelo: " + m.list[0].label + " ✓"];
+}
+
+async function askAI(text, withPhoto) {
+  const p = PROVIDERS[provider];
+  const key = store.get(p.keyStore);
+  if (!key) return [false, "Falta la API key de " + p.name + ". Pégala en el panel del simulador."];
+  if (!online()) return [false, "Sin internet. Revisa tu conexión."];
+  return provider === "gemini" ? askGemini(text, withPhoto, key) : askClaude(text, withPhoto, key, currentModel());
+}
+
+// Lista de modelos del proveedor elegido
+function fillModels(selected) {
+  const sel = document.getElementById("model");
+  let opts;
+  if (provider === "claude") opts = CLAUDE_MODELS;
+  else {
+    let list = [];
+    try { list = JSON.parse(store.get("gemini_models") || "[]"); } catch (e) { list = []; }
+    opts = list.length ? list.map((m, i) => [m.id, m.label + (i === 0 ? " (recomendado)" : "")])
+      : [["auto", "Automático (se elige al probar la key)"]];
+  }
+  sel.innerHTML = "";
+  for (const [v, t] of opts) { const o = document.createElement("option"); o.value = v; o.textContent = t; sel.appendChild(o); }
+  const want = selected || store.get("model_" + provider) || (provider === "claude" ? store.get("model") : null);
+  if (want && [...sel.options].some((o) => o.value === want)) sel.value = want;
 }
 
 // ------------------------------------------------------------------ funciones hal_* (las importa core.wasm)
@@ -216,28 +423,29 @@ const hal = {
 
   hal_ai_send(ptr, len, withPhoto) {
     const text = readUTF8(ptr, len);
-    askClaude(text, withPhoto).then(([ok, reply]) => {
+    askAI(text, withPhoto).then(([ok, reply]) => {
       photoCanvas = null; photoB64 = null;
       core.core_on_reply(writeIO(reply), ok ? 1 : 0);
     });
   },
-  hal_ai_reset() { history = []; },
+  hal_ai_reset() { claudeHistory = []; geminiHistory = []; },
 
   hal_wifi_scan() {
     clearTimeout(wifiTimer);
     wifiTimer = setTimeout(() => {
-      const list = NETS.map(([s, r, sec]) => `${s}\t${r + Math.round(Math.random() * 6 - 3)}\t${sec}`).join("\n");
-      core.core_on_wifi_scan(writeIO(list));
-    }, 900);
+      const list = [];
+      if (online()) list.push(`${REAL_NET}\t-45\t0`);
+      list.push(`${TEST_NET}\t-67\t1`);
+      core.core_on_wifi_scan(writeIO(list.join("\n")));
+    }, 700);
   },
   hal_wifi_connect(ssidPtr, passPtr) {
     const ssid = cString(ssidPtr), pass = cString(passPtr);
-    const net = NETS.find((n) => n[0] === ssid);
-    const ok = net && (!net[2] || pass.length >= 8);
+    const ok = online() && (ssid === REAL_NET || (ssid === TEST_NET && pass.length >= 8));
     setTimeout(() => {
-      if (ok) { store.set("wifi", ssid); writeIO(ssid); } else store.set("wifi", null);
+      if (ok) { store.set("wifi", ssid); writeIO(ssid); }
       core.core_on_wifi_result(ok ? 1 : 0);
-    }, 1200);
+    }, 900);
   },
 
   m_sin: Math.sin, m_cos: Math.cos, m_tan: Math.tan, m_asin: Math.asin, m_acos: Math.acos, m_atan: Math.atan,
@@ -331,20 +539,58 @@ function onKey(e, down) {
 // ------------------------------------------------------------------ panel
 function setupPanel() {
   const key = document.getElementById("apikey"), status = document.getElementById("keystatus");
-  const model = document.getElementById("model");
+  const model = document.getElementById("model"), prov = document.getElementById("provider");
+  const label = document.getElementById("keylabel");
   const showStatus = () => {
-    const has = !!store.get("apikey");
-    status.textContent = has ? "API key guardada en este navegador. ✓" : "La key se guarda solo en este navegador y se envía únicamente a api.anthropic.com.";
+    const p = PROVIDERS[provider], has = !!store.get(p.keyStore);
+    label.textContent = "API key de " + p.name;
+    status.textContent = has ? "API key de " + p.name + " guardada en este navegador. ✓" : p.note;
     status.classList.toggle("ok", has);
-    key.placeholder = has ? "•••••••• (guardada)" : "sk-ant-...";
+    key.placeholder = has ? "•••••••• (guardada)" : p.keyHint;
   };
+  const applyProvider = (newChat) => {
+    prov.value = provider;
+    fillModels();
+    showStatus();
+    const p = PROVIDERS[provider];
+    core.core_set_ai(writeIO(p.name), p.color);
+    if (newChat) { claudeHistory = []; geminiHistory = []; core.core_ai_new_chat(); }
+  };
+  prov.addEventListener("change", () => {
+    provider = prov.value === "gemini" ? "gemini" : "claude";
+    store.set("provider", provider);
+    key.value = "";
+    applyProvider(true);
+  });
   document.getElementById("savekey").addEventListener("click", () => {
     const v = key.value.trim();
-    store.set("apikey", v || null); key.value = ""; showStatus();
+    store.set(PROVIDERS[provider].keyStore, v || null); key.value = ""; showStatus();
   });
-  const m = store.get("model"); if (m) model.value = m;
-  model.addEventListener("change", () => store.set("model", model.value));
-  showStatus();
+  model.addEventListener("change", () => store.set("model_" + provider, model.value));
+  applyProvider(false);
+
+  const testBtn = document.getElementById("testkey");
+  testBtn.addEventListener("click", async () => {
+    const p = PROVIDERS[provider];
+    const k = key.value.trim() || store.get(p.keyStore);
+    if (!k) { status.textContent = "Primero pega tu API key."; status.classList.remove("ok"); return; }
+    testBtn.disabled = true; status.textContent = "Probando la key…"; status.classList.remove("ok");
+    const [ok, msg] = provider === "gemini" ? await testGemini(k) : await testClaude(k, model.value);
+    if (ok && key.value.trim()) { store.set(p.keyStore, k); key.value = ""; key.placeholder = "•••••••• (guardada)"; }
+    status.textContent = msg; status.classList.toggle("ok", ok);
+    testBtn.disabled = false;
+  });
+
+  // Escribir con el teclado del celular (atajo del simulador para el modo IA)
+  const quick = document.getElementById("quick");
+  quick.addEventListener("input", () => {
+    if (core.core_wants_text()) for (const ch of quick.value) core.core_input_char(ch.codePointAt(0));
+    quick.value = "";
+  });
+  quick.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); press(K.ENTER, true); press(K.ENTER, false); }
+    else if (e.key === "Backspace" && !quick.value) { e.preventDefault(); press(K.DEL, true); press(K.DEL, false); }
+  });
 
   document.getElementById("combo").addEventListener("click", () => {
     press(K.YEQU, true); press(K.GRAPH, true); press(K.GRAPH, false); press(K.YEQU, false);
@@ -361,8 +607,11 @@ async function main() {
   setupPanel();
   window.addEventListener("keydown", (e) => onKey(e, true));
   window.addEventListener("keyup", (e) => onKey(e, false));
-  const saved = store.get("wifi");                 // como la calculadora real: se reconecta sola
-  if (saved) { writeIO(saved); core.core_on_wifi_result(1); }
+  // Como la calculadora real: al prender se conecta sola a la red guardada.
+  const reconnect = () => { if (online()) { writeIO(store.get("wifi") || REAL_NET); core.core_on_wifi_result(1); } };
+  reconnect();
+  window.addEventListener("online", reconnect);
+  window.addEventListener("offline", () => core.core_on_wifi_result(0));
   window.calc = { core, K, press };                // para pruebas
   loop();
 }

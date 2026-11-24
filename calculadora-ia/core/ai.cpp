@@ -13,6 +13,10 @@ char g_io[IO_CAP];
 #define C_DIM    rgb(140, 146, 160)
 #define C_USER   rgb(120, 200, 255)
 #define C_CLAUDE rgb(217, 119, 87)
+
+// Nombre y color del asistente (Claude o Gemini, lo elige la plataforma)
+static char ai_name[20] = "Claude";
+static uint16_t ai_color = C_CLAUDE;
 #define C_OK     rgb(80, 220, 120)
 #define C_WARN   rgb(255, 190, 80)
 #define C_SEL    rgb(60, 70, 100)
@@ -184,7 +188,7 @@ void ai_key(int k) {
       if (k == K_YEQU) { if (photo_attached) { photo_attached = false; hal_photo_discard(); } return; }
       if (k == K_WINDOW) { go_camera(); return; }
       if (k == K_ZOOM) { go_wifi(); return; }
-      if (k == K_TRACE) { nmsg = 0; cused = 0; scroll = 0; hal_ai_reset(); add_sys("Nuevo chat."); return; }
+      if (k == K_TRACE) { hal_ai_reset(); ai_new_chat(); return; }
       field_key(input, k);
       return;
     case S_CAM:
@@ -219,6 +223,33 @@ void ai_key(int k) {
       field_key(pass, k);
       return;
   }
+}
+
+void ai_set_assistant(const char* utf8, int len, uint16_t color) {
+  utf8_to_local(utf8, len, ai_name, sizeof ai_name);
+  ai_color = color;
+  g_dirty = true;
+}
+
+void ai_new_chat(void) {
+  nmsg = 0; cused = 0; scroll = 0; waiting = false;
+  char m[48] = "Nuevo chat con ";
+  s_cpy(m + 15, ai_name, sizeof m - 16);
+  int n = s_len(m); m[n] = '.'; m[n + 1] = 0;
+  add_msg(R_SYS, m, n + 1, false);
+}
+
+// Texto del chat para pruebas automáticas: nombre del asistente y mensajes
+int ai_debug_text(char* out, int cap) {
+  int o = 0;
+  auto put = [&](const char* t, int n) { for (int i = 0; i < n && o < cap - 1; i++) out[o++] = t[i]; };
+  put(ai_name, s_len(ai_name)); put("\n", 1);
+  for (int m = 0; m < nmsg; m++) {
+    put(msgs[m].role == R_USER ? "> " : msgs[m].role == R_AI ? "< " : "# ", 2);
+    put(cbuf + msgs[m].off, msgs[m].len); put("\n", 1);
+  }
+  out[o] = 0;
+  return o;
 }
 
 void ai_on_reply(int len, int ok) {
@@ -363,7 +394,7 @@ static void build_lines() {
 }
 
 static void draw_chat() {
-  status_bar("Claude", C_CLAUDE);
+  status_bar(ai_name, ai_color);
   // área de escritura (abajo)
   int in_cols = 50;
   int in_rows = input.n / in_cols + 1; if (in_rows > 3) in_rows = 3;
@@ -395,14 +426,14 @@ static void draw_chat() {
                         "ALPHA cambia abc/ABC/123.  2nd: á é í ó ú ñ ¿ ¡ ,",
                         "F2: foto   F3: WiFi   F4: nuevo chat",
                         "ON: volver a la calculadora normal" };
-    for (int i = 0; i < 6; i++) { char t[80]; utf8_to_local(h[i], s_len(h[i]), t, sizeof t); gfx_str(4, top + i * CH_H, t, i ? C_DIM : C_CLAUDE); }
+    for (int i = 0; i < 6; i++) { char t[80]; utf8_to_local(h[i], s_len(h[i]), t, sizeof t); gfx_str(4, top + i * CH_H, t, i ? C_DIM : ai_color); }
   }
   for (int i = 0; i < vis && start + i < nl; i++) {
     Line& l = lines[start + i];
     int ly = top + i * CH_H;
     switch (l.kind) {
       case L_HUSER: gfx_str(4, ly, "T\xFA:", C_USER); break;
-      case L_HAI: gfx_str(4, ly, "Claude:", C_CLAUDE); break;
+      case L_HAI: { int w = gfx_str(4, ly, ai_name, ai_color); gfx_char(4 + w, ly, ':', ai_color); break; }
       case L_PHOTO: gfx_char(10, ly, CH_CAM, C_USER); gfx_str(18, ly, "foto", C_USER); break;
       case L_WAIT: { char t[20] = "pensando"; int n = 8; for (int d = 0; d < dots; d++) t[n++] = '.'; gfx_text(10, ly, t, n, C_DIM); break; }
       case L_BLANK: break;
