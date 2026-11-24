@@ -115,57 +115,107 @@ function cameraSource() {
 }
 const brightness = () => `brightness(${1 + camLevel * 0.25})`;
 
-// ------------------------------------------------------------------ WiFi simulado
-const NETS = [["Casa_Jose", -48, 1], ["Vecino_5G", -71, 1], ["Cafe_Libre", -80, 0], ["Familia_Perez", -63, 1]];
+// ------------------------------------------------------------------ WiFi
+// El navegador no puede elegir redes WiFi: el simulador usa la conexión real de tu
+// celular o computador. La "Red de prueba" sirve para practicar la pantalla de contraseña
+// (en la calculadora real esa pantalla conecta la XIAO a tu WiFi).
+const REAL_NET = "Este equipo (real)";
+const TEST_NET = "Red de prueba";
 let wifiTimer = null;
+const online = () => navigator.onLine !== false;
 
 // ------------------------------------------------------------------ Claude
-let history = [];   // mensajes de la API (la conversación)
+const API = "https://api.anthropic.com/v1";
+let history = [];   // la conversación (se manda completa en cada mensaje)
 
-async function askClaude(text, withPhoto) {
-  const key = store.get("apikey");
-  if (!key) return [false, "Falta la API key. Pégala en el panel del simulador (1. Configura Claude)."];
-  const model = document.getElementById("model").value;
-  const content = [];
-  if (withPhoto && photoB64) content.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: photoB64 } });
-  content.push({ type: "text", text });
-  history.push({ role: "user", content });
-
-  const body = {
-    model,
-    max_tokens: 4096,
-    system: cString(core.core_system_prompt()),
-    messages: history,
-    output_config: { effort: "low" },
-  };
-  const headers = {
+function apiHeaders(key, model) {
+  const h = {
     "content-type": "application/json",
     "x-api-key": key,
     "anthropic-version": "2026-10-21",
     "anthropic-dangerous-direct-browser-access": "true",
   };
-  if (model !== "claude-haiku-5-5") {      // si un filtro de seguridad rechaza, reintenta con otro modelo
-    body.fallbacks = "default";
-    headers["anthropic-beta"] = "server-side-fallback-2026-07-01";
-  }
-  try {
-    const res = await fetch("https://api.anthropic.com/v1/messages", { method: "POST", headers, body: JSON.stringify(body) });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      history.pop();
-      const msg = data && data.error && data.error.message ? data.error.message : res.statusText;
-      if (res.status === 401) return [false, "API key inválida. Revísala en el panel del simulador."];
-      if (res.status === 429) return [false, "Demasiadas solicitudes o sin crédito. Espera un momento."];
-      return [false, `Error ${res.status}: ${msg}`];
+  if (model && model !== "claude-haiku-5-5") h["anthropic-beta"] = "server-side-fallback-2026-07-01";
+  return h;
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// POST con reintentos (saturación, límites, fallas de red) y tiempo límite.
+async function apiPost(path, body, key, model, timeoutMs) {
+  let last = null;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const res = await fetch(API + path, { method: "POST", headers: apiHeaders(key, model), body: JSON.stringify(body), signal: ctrl.signal });
+      clearTimeout(timer);
+      const data = await res.json().catch(() => ({}));
+      last = { status: res.status, data };
+      const retry = res.status === 429 || res.status === 529 || res.status >= 500;
+      if (!retry || attempt === 2) return last;
+      const after = parseFloat(res.headers.get("retry-after"));
+      await sleep(Math.min(isFinite(after) ? after * 1000 : 1500 * (attempt + 1), 10000));
+    } catch (e) {
+      clearTimeout(timer);
+      last = { status: 0, timeout: e.name === "AbortError", data: {} };
+      if (attempt === 2 || last.timeout) return last;
+      await sleep(1500 * (attempt + 1));
     }
-    if (data.stop_reason === "refusal") { history.pop(); return [false, "Claude no puede responder eso."]; }
-    history.push({ role: "assistant", content: data.content });
-    const out = data.content.filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
-    return [true, out || "(sin respuesta)"];
-  } catch (e) {
-    history.pop();
-    return [false, "Sin conexión con la API: " + e.message];
   }
+  return last;
+}
+
+function friendlyError(r, model) {
+  const msg = (r.data && r.data.error && r.data.error.message) || "";
+  if (r.timeout) return "Claude tardó demasiado en responder. Intenta de nuevo.";
+  if (r.status === 0) return online() ? "No se pudo conectar con la API de Claude." : "Sin internet. Revisa tu conexión.";
+  if (r.status === 400 && /credit/i.test(msg)) return "No tienes crédito en la API. Recarga en console.anthropic.com.";
+  if (r.status === 401) return "API key inválida. Revísala en el panel del simulador.";
+  if (r.status === 403) return "Tu API key no tiene permiso para usar " + model + ".";
+  if (r.status === 404) return "El modelo " + model + " no está disponible para tu cuenta.";
+  if (r.status === 413) return "La foto es demasiado grande. Intenta de nuevo.";
+  if (r.status === 429) return "Demasiadas solicitudes seguidas. Espera un momento.";
+  if (r.status === 529 || r.status >= 500) return "Claude está saturado ahora. Intenta en un rato.";
+  return "Error " + r.status + (msg ? ": " + msg.slice(0, 160) : "");
+}
+
+async function askClaude(text, withPhoto) {
+  const key = store.get("apikey");
+  if (!key) return [false, "Falta la API key. Pégala en el panel del simulador (1. Configura Claude)."];
+  if (!online()) return [false, "Sin internet. Revisa tu conexión."];
+  const model = document.getElementById("model").value;
+  const content = [];
+  const hasPhoto = withPhoto && photoB64;
+  if (hasPhoto) content.push({ type: "image", source: { type: "base64", media_type: "image/jpeg", data: photoB64 } });
+  content.push({ type: "text", text });
+  history.push({ role: "user", content });
+
+  const body = {
+    model,
+    max_tokens: 16000,
+    system: cString(core.core_system_prompt()),
+    messages: history,
+    output_config: { effort: hasPhoto ? "medium" : "low" },   // con foto piensa un poco más
+    cache_control: { type: "ephemeral" },                     // abarata los chats largos y con fotos
+  };
+  if (model !== "claude-haiku-5-5") body.fallbacks = "default";
+
+  const r = await apiPost("/messages", body, key, model, 90000);
+  if (r.status !== 200) { history.pop(); return [false, friendlyError(r, model)]; }
+  const data = r.data;
+  if (data.stop_reason === "refusal") { history.pop(); return [false, "Claude no puede responder eso."]; }
+  history.push({ role: "assistant", content: data.content });
+  let out = (data.content || []).filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
+  if (data.stop_reason === "max_tokens") out += " (respuesta cortada)";
+  return [true, out || "(sin respuesta)"];
+}
+
+// Comprueba la key sin gastar crédito (contar tokens es gratis)
+async function testKey(key, model) {
+  const r = await apiPost("/messages/count_tokens", { model, messages: [{ role: "user", content: "hola" }] }, key, null, 20000);
+  if (r.status === 200) return [true, "La key funciona con " + model + ". ✓"];
+  return [false, friendlyError(r, model)];
 }
 
 // ------------------------------------------------------------------ funciones hal_* (las importa core.wasm)
@@ -226,18 +276,19 @@ const hal = {
   hal_wifi_scan() {
     clearTimeout(wifiTimer);
     wifiTimer = setTimeout(() => {
-      const list = NETS.map(([s, r, sec]) => `${s}\t${r + Math.round(Math.random() * 6 - 3)}\t${sec}`).join("\n");
-      core.core_on_wifi_scan(writeIO(list));
-    }, 900);
+      const list = [];
+      if (online()) list.push(`${REAL_NET}\t-45\t0`);
+      list.push(`${TEST_NET}\t-67\t1`);
+      core.core_on_wifi_scan(writeIO(list.join("\n")));
+    }, 700);
   },
   hal_wifi_connect(ssidPtr, passPtr) {
     const ssid = cString(ssidPtr), pass = cString(passPtr);
-    const net = NETS.find((n) => n[0] === ssid);
-    const ok = net && (!net[2] || pass.length >= 8);
+    const ok = online() && (ssid === REAL_NET || (ssid === TEST_NET && pass.length >= 8));
     setTimeout(() => {
-      if (ok) { store.set("wifi", ssid); writeIO(ssid); } else store.set("wifi", null);
+      if (ok) { store.set("wifi", ssid); writeIO(ssid); }
       core.core_on_wifi_result(ok ? 1 : 0);
-    }, 1200);
+    }, 900);
   },
 
   m_sin: Math.sin, m_cos: Math.cos, m_tan: Math.tan, m_asin: Math.asin, m_acos: Math.acos, m_atan: Math.atan,
@@ -346,6 +397,28 @@ function setupPanel() {
   model.addEventListener("change", () => store.set("model", model.value));
   showStatus();
 
+  const testBtn = document.getElementById("testkey");
+  testBtn.addEventListener("click", async () => {
+    const k = key.value.trim() || store.get("apikey");
+    if (!k) { status.textContent = "Primero pega tu API key."; status.classList.remove("ok"); return; }
+    testBtn.disabled = true; status.textContent = "Probando la key…"; status.classList.remove("ok");
+    const [ok, msg] = await testKey(k, model.value);
+    if (ok && key.value.trim()) { store.set("apikey", k); key.value = ""; key.placeholder = "•••••••• (guardada)"; }
+    status.textContent = msg; status.classList.toggle("ok", ok);
+    testBtn.disabled = false;
+  });
+
+  // Escribir con el teclado del celular (atajo del simulador para el modo IA)
+  const quick = document.getElementById("quick");
+  quick.addEventListener("input", () => {
+    if (core.core_wants_text()) for (const ch of quick.value) core.core_input_char(ch.codePointAt(0));
+    quick.value = "";
+  });
+  quick.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") { e.preventDefault(); press(K.ENTER, true); press(K.ENTER, false); }
+    else if (e.key === "Backspace" && !quick.value) { e.preventDefault(); press(K.DEL, true); press(K.DEL, false); }
+  });
+
   document.getElementById("combo").addEventListener("click", () => {
     press(K.YEQU, true); press(K.GRAPH, true); press(K.GRAPH, false); press(K.YEQU, false);
   });
@@ -361,8 +434,11 @@ async function main() {
   setupPanel();
   window.addEventListener("keydown", (e) => onKey(e, true));
   window.addEventListener("keyup", (e) => onKey(e, false));
-  const saved = store.get("wifi");                 // como la calculadora real: se reconecta sola
-  if (saved) { writeIO(saved); core.core_on_wifi_result(1); }
+  // Como la calculadora real: al prender se conecta sola a la red guardada.
+  const reconnect = () => { if (online()) { writeIO(store.get("wifi") || REAL_NET); core.core_on_wifi_result(1); } };
+  reconnect();
+  window.addEventListener("online", reconnect);
+  window.addEventListener("offline", () => core.core_on_wifi_result(0));
   window.calc = { core, K, press };                // para pruebas
   loop();
 }

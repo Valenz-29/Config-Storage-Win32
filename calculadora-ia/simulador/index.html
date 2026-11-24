@@ -24,6 +24,7 @@
       <div class="row">
         <input id="apikey" type="password" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
         <button id="savekey" type="button">Guardar</button>
+        <button id="testkey" type="button" class="secondary">Probar</button>
       </div>
       <label for="model">Modelo</label>
       <select id="model">
@@ -37,19 +38,22 @@
     <div class="card">
       <h2>2. Pruébalo</h2>
       <button id="combo" class="combo" type="button">Apretar Y= + GRAPH juntas</button>
+      <label for="quick">Escribir rápido en el modo IA (atajo del simulador)</label>
+      <input id="quick" type="text" placeholder="Toca aquí y escribe con el teclado del celular" autocomplete="off" autocapitalize="sentences">
       <ul class="help">
         <li><b>Combinación secreta:</b> mantén <kbd>Y=</kbd> y aprieta <kbd>GRAPH</kbd> (o usa el botón de arriba). En el celular puedes tocar las dos a la vez.</li>
         <li><b>ON</b> vuelve a la calculadora normal al instante. <b>2nd + ON</b> la apaga.</li>
+        <li><b>Modo normal:</b> cálculos con el orden de la TI, MATH/NUM/PRB, TEST, ANGLE, DISTR, VARS, MODE (Float/Fix, Sci/Eng, grados), STO→/RCL, 2nd ENTRY, Y=, GRAPH, TRACE, CALC, ZOOM, WINDOW, TABLE, FORMAT, MEM y CATALOG. Listas, matrices, programas y apps llegan con el emulador.</li>
         <li>En modo IA: <kbd>F2</kbd> foto, <kbd>F3</kbd> WiFi, <kbd>F4</kbd> nuevo chat, <kbd>ENTER</kbd> enviar.</li>
         <li><b>ALPHA</b> cambia entre abc / ABC / 123. <b>2nd</b> + letra pone tilde (á é í ó ú ñ), 2nd + ? = ¿, 2nd + ! (tecla 3) = ¡, 2nd + . = coma.</li>
         <li>Clic derecho en una tecla la deja <i>mantenida</i> (para combinaciones con el mouse).</li>
         <li>Teclado del PC: números y + − * / ^ ( ) . ENTER, Retroceso = DEL, Esc = CLEAR, flechas, Fin = ON. En modo IA puedes escribir directo.</li>
-        <li>WiFi simulado: cualquier contraseña de 8 o más caracteres funciona.</li>
+        <li><b>WiFi:</b> el simulador usa el internet real de tu equipo («Este equipo (real)»). La «Red de prueba» es para practicar la contraseña: sirve cualquiera de 8 o más caracteres.</li>
       </ul>
     </div>
   </aside>
 </main>
-<video id="video" playsinline muted hidden></video>
+<video id="video" playsinline muted autoplay class="offscreen"></video>
 <script src="sim.js"></script>
 </body>
 </html>

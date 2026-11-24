@@ -78,6 +78,10 @@ EXPORT(core_input_char) void core_input_char(uint32_t cp) {
   if (c && c != '\n') ai_char(c);
 }
 
+// Texto de la pantalla del modo normal (para pruebas automáticas)
+int ti_debug_text(char* out, int cap);
+EXPORT(core_debug_ti) int core_debug_ti(void) { return ti_debug_text(g_io, IO_CAP); }
+
 EXPORT(core_on_reply) void core_on_reply(int len, int ok) { ai_on_reply(len, ok); }
 EXPORT(core_on_photo) void core_on_photo(int ok) { ai_on_photo(ok); }
 EXPORT(core_on_wifi_scan) void core_on_wifi_scan(int len) { ai_on_wifi_scan(len); }
