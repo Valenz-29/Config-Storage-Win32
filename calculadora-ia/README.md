@@ -29,7 +29,7 @@ calculadora-ia/
 │       └── ti.cpp     Navegación, errores (1:Quit 2:Goto), 2nd/ALPHA, ON/OFF
 ├── simulador/         Plataforma "navegador": implementa hal.h con la cámara, fetch, etc.
 ├── tests/             Pruebas automáticas (modo normal y modo IA)
-├── tools/             gen_font.py (genera las fuentes)
+├── tools/             gen_font.py (genera las fuentes) y nvidia-relay/ (relevo para NVIDIA)
 └── build.sh           Compila core/ a simulador/core.wasm
 ```
 
@@ -68,12 +68,17 @@ emulador de la TI-83 Plus usando la ROM de tu propia calculadora.
 
 ## Modo IA
 
-- Chat con **Claude** o **Gemini** (se elige en el panel del simulador; cada uno con su key).
+- Chat con **Claude**, **Gemini** o **NVIDIA** (se elige en el panel del simulador; cada uno con su key).
   - Claude: Opus 5.5 por defecto, también Sonnet 5.5 o Haiku 5.5. La key se saca en
     console.anthropic.com y necesita crédito.
   - Gemini: la key se saca gratis en aistudio.google.com. Los modelos cambian seguido, así que
     el simulador le pregunta a Google cuáles hay y elige el "flash" estable más nuevo. En el
     plan gratis Google puede usar lo que envías para mejorar sus productos: no mandes datos personales.
+  - NVIDIA: la key (`nvapi-...`) se saca en build.nvidia.com. NVIDIA no permite llamadas desde
+    páginas web, así que el simulador necesita un **relevo** propio y gratis en Cloudflare
+    (instrucciones en [`tools/nvidia-relay`](tools/nvidia-relay/README.md)). Sus modelos cambian
+    seguido: el simulador pide la lista, marca con "(fotos)" los que aceptan imágenes y, si un
+    modelo fue retirado, elige otro solo. En la calculadora real no hace falta el relevo.
 - Foto: visor en vivo → revisión (Repetir/Usar) → la foto queda adjunta y escribes el mensaje.
 - Reintenta solo si la IA está saturada o hay un corte de red; mensajes de error claros
   (key inválida, sin crédito, límite del plan gratis, sin internet, tiempo límite).
@@ -92,7 +97,7 @@ cd calculadora-ia/simulador
 python3 -m http.server 8000
 ```
 
-Abre <http://localhost:8000>, elige **Claude** o **Gemini**, pega tu API key en el panel y
+Abre <http://localhost:8000>, elige **Claude**, **Gemini** o **NVIDIA**, pega tu API key en el panel y
 pulsa **Probar** (verifica la key sin gastar crédito). La key se guarda solo en ese navegador.
 
 ## Recompilar y probar
@@ -102,7 +107,7 @@ Necesitas `clang` con soporte WebAssembly (`wasm-ld`) y Node.js:
 ```sh
 ./build.sh                      # compila core/ -> simulador/core.wasm
 node tests/ti.test.js           # pruebas del modo normal (teclas -> pantalla)
-(cd simulador && python3 -m http.server 8765 &) && node tests/ai.browser.js   # modo IA con Claude y Gemini (Playwright)
+(cd simulador && python3 -m http.server 8765 &) && node tests/ai.browser.js   # modo IA con Claude, Gemini y NVIDIA (Playwright)
 python3 tools/gen_font.py core/font.h   # solo si cambias las fuentes
 ```
 

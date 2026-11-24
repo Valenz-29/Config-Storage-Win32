@@ -132,6 +132,10 @@ const PROVIDERS = {
     name: "Claude", color: rgb565(217, 119, 87), keyStore: "apikey", keyHint: "sk-ant-...",
     note: "Consigue tu key en console.anthropic.com (necesita crédito, desde USD 5). Se guarda solo en este navegador y se envía únicamente a api.anthropic.com.",
   },
+  nvidia: {
+    name: "NVIDIA", color: rgb565(118, 185, 0), keyStore: "apikey_nvidia", keyHint: "nvapi-...",
+    note: "Consigue tu key en build.nvidia.com (cuenta de desarrollador de NVIDIA; acceso de prueba con límites). En el navegador necesita tu relevo (abajo). La key se guarda solo en este navegador y viaja solo a tu relevo y a NVIDIA.",
+  },
   gemini: {
     name: "Gemini", color: rgb565(138, 180, 248), keyStore: "apikey_gemini", keyHint: "AIza...",
     note: "Consigue tu key gratis en aistudio.google.com. En el plan gratis, Google puede usar lo que envías (y personas pueden revisarlo) para mejorar sus productos: no mandes datos personales. La key se guarda solo en este navegador y se envía únicamente a generativelanguage.googleapis.com.",
@@ -139,7 +143,8 @@ const PROVIDERS = {
 };
 const CLAUDE_MODELS = [["claude-opus-5-5", "Claude Opus 5.5 (el más capaz)"], ["claude-sonnet-5-5", "Claude Sonnet 5.5"],
   ["claude-haiku-5-5", "Claude Haiku 5.5 (el más barato)"]];
-let provider = store.get("provider") === "gemini" ? "gemini" : "claude";
+const pickProvider = (v) => (v === "gemini" || v === "nvidia" ? v : "claude");
+let provider = pickProvider(store.get("provider"));
 const currentModel = () => document.getElementById("model").value;
 
 // Solicitud con reintentos (saturación, límites cortos, fallas de red) y tiempo límite.
@@ -350,12 +355,118 @@ async function testGemini(key) {
   return [true, "La key funciona. Modelo: " + m.list[0].label + " ✓"];
 }
 
+// ------------------------------------------------------------------ NVIDIA (API compatible con OpenAI)
+// NVIDIA no permite llamadas desde páginas web (CORS), así que en el navegador se usa tu
+// relevo (tools/nvidia-relay). La calculadora real se conecta directo, sin relevo.
+let nvidiaHistory = [];
+const nvidiaRelay = () => (store.get("nvidia_relay") || "").trim().replace(/\/+$/, "");
+const nvidiaBase = () => nvidiaRelay() + "/v1";
+const NO_RELAY = "El navegador no puede hablar directo con NVIDIA. Pega la dirección de tu relevo en el panel (ver instrucciones).";
+const nvidiaHeaders = (key) => Object.assign({ "content-type": "application/json", "accept": "application/json" },
+  key ? { authorization: "Bearer " + key } : {});
+
+function nvidiaRetry(r, attempt) {
+  if (r.status >= 500) return 1500 * (attempt + 1);
+  if (r.status === 429) {
+    const a = parseFloat(r.headers && r.headers.get("retry-after"));
+    if (isFinite(a)) return a <= 10 ? a * 1000 : null;
+    return 2000 * (attempt + 1);
+  }
+  return null;
+}
+
+function nvidiaError(r, model, hadPhoto) {
+  const d = r.data || {};
+  const msg = String((d.error && (d.error.message || d.error)) || d.detail || d.title || "");
+  if (r.timeout) return "NVIDIA tardó demasiado en responder. Intenta de nuevo.";
+  if (r.status === 0) return online() ? "No se pudo conectar con tu relevo de NVIDIA. Revisa la dirección." : "Sin internet. Revisa tu conexión.";
+  if (r.status === 401 || r.status === 403) return "API key de NVIDIA inválida o sin permiso. Revísala en el panel.";
+  if (r.status === 402) return "Se acabaron tus créditos de NVIDIA.";
+  if (r.status === 404 || r.status === 410) return "El modelo " + model + " ya no está disponible.";
+  if ((r.status === 400 || r.status === 422) && hadPhoto) return "Este modelo no acepta fotos. Elige uno marcado con (fotos).";
+  if (r.status === 429) return "Llegaste al límite de uso de NVIDIA por ahora. Espera un rato.";
+  if (r.status >= 500) return "NVIDIA está saturado ahora. Intenta en un rato.";
+  return "Error " + r.status + (msg ? ": " + msg.slice(0, 160) : "");
+}
+
+// NVIDIA cambia y retira modelos seguido: se pide la lista y se dejan solo los de chat.
+const NVIDIA_SKIP = /embed|retriever|rerank|safety|guard|clip|detector|pii|starcoder|calibration|translate|reward|parse|ocr|asr|tts|riva|cosmos|gliner|muse|video/i;
+const nvidiaVision = (m) => m.model_type === "vlm" || /(^|[-_/])vl([-_]|$)|vision|omni|gemma-3/i.test(m.id);
+function nvidiaRank(m) {   // primero los que aceptan fotos, de NVIDIA, sin razonamiento largo y estables
+  return [m.vision ? 0 : 1, /^nvidia\//.test(m.id) ? 0 : 1, /reasoning|thinking/i.test(m.id) ? 1 : 0, /preview|exp|beta/i.test(m.id) ? 1 : 0];
+}
+async function nvidiaModels(key) {
+  const r = await request("GET", nvidiaBase() + "/models", nvidiaHeaders(key), null, 20000, nvidiaRetry);
+  if (r.status !== 200) return { error: nvidiaError(r, "", false) };
+  const list = ((r.data && r.data.data) || []).filter((m) => m && m.id && !NVIDIA_SKIP.test(m.id))
+    .map((m) => ({ id: m.id, vision: nvidiaVision(m) }))
+    .map((m) => Object.assign(m, { label: m.id + (m.vision ? " (fotos)" : "") }));
+  if (!list.length) return { error: "NVIDIA no devolvió modelos de chat." };
+  list.sort((a, b) => {
+    const x = nvidiaRank(a), y = nvidiaRank(b);
+    for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i] - y[i];
+    return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
+  });
+  store.set("nvidia_models", JSON.stringify(list));
+  return { list };
+}
+
+async function askNvidia(text, withPhoto, key) {
+  if (!nvidiaRelay()) return [false, NO_RELAY];
+  let model = currentModel();
+  if (!model || model === "auto") {
+    const m = await nvidiaModels(key);
+    if (m.error) return [false, m.error];
+    fillModels();
+    model = m.list[0].id;
+  }
+  const hasPhoto = withPhoto && photoB64;
+  const content = hasPhoto
+    ? [{ type: "text", text }, { type: "image_url", image_url: { url: "data:image/jpeg;base64," + photoB64 } }]
+    : text;
+  nvidiaHistory.push({ role: "user", content });
+  const send = () => request("POST", nvidiaBase() + "/chat/completions", nvidiaHeaders(key), {
+    model,
+    messages: [{ role: "system", content: cString(core.core_system_prompt()) }].concat(nvidiaHistory),
+    max_tokens: 4096,
+    stream: false,
+  }, 120000, nvidiaRetry);
+  let r = await send();
+  if (r.status === 404 || r.status === 410) {      // modelo retirado: elegir otro y reintentar
+    const m = await nvidiaModels(key);
+    if (!m.error && m.list[0].id !== model) { model = m.list[0].id; fillModels(model); r = await send(); }
+  }
+  if (r.status !== 200) { nvidiaHistory.pop(); return [false, nvidiaError(r, model, hasPhoto)]; }
+  const ch = ((r.data && r.data.choices) || [])[0];
+  let txt = ch && ch.message && typeof ch.message.content === "string" ? ch.message.content : "";
+  txt = txt.replace(/<think>[\s\S]*?<\/think>/g, "").replace(/^[\s\S]*<\/think>/, "").trim();   // sin el razonamiento
+  if (!txt) { nvidiaHistory.pop(); return [false, "NVIDIA no respondió nada. Intenta de nuevo."]; }
+  nvidiaHistory.push({ role: "assistant", content: txt });
+  if (ch.finish_reason === "length") txt += " (respuesta cortada)";
+  return [true, txt];
+}
+
+// Comprueba relevo, modelos y key (hace una solicitud mínima de 1 token)
+async function testNvidia(key) {
+  if (!nvidiaRelay()) return [false, "Primero pega la dirección de tu relevo (ver instrucciones)."];
+  const m = await nvidiaModels(key);
+  if (m.error) return [false, m.error];
+  fillModels();
+  const model = currentModel() && currentModel() !== "auto" ? currentModel() : m.list[0].id;
+  const r = await request("POST", nvidiaBase() + "/chat/completions", nvidiaHeaders(key),
+    { model, messages: [{ role: "user", content: "hola" }], max_tokens: 1 }, 30000, nvidiaRetry);
+  if (r.status === 200) return [true, "La key funciona. Modelo: " + model + " ✓"];
+  return [false, nvidiaError(r, model, false)];
+}
+
 async function askAI(text, withPhoto) {
   const p = PROVIDERS[provider];
   const key = store.get(p.keyStore);
   if (!key) return [false, "Falta la API key de " + p.name + ". Pégala en el panel del simulador."];
   if (!online()) return [false, "Sin internet. Revisa tu conexión."];
-  return provider === "gemini" ? askGemini(text, withPhoto, key) : askClaude(text, withPhoto, key, currentModel());
+  if (provider === "gemini") return askGemini(text, withPhoto, key);
+  if (provider === "nvidia") return askNvidia(text, withPhoto, key);
+  return askClaude(text, withPhoto, key, currentModel());
 }
 
 // Lista de modelos del proveedor elegido
@@ -365,7 +476,7 @@ function fillModels(selected) {
   if (provider === "claude") opts = CLAUDE_MODELS;
   else {
     let list = [];
-    try { list = JSON.parse(store.get("gemini_models") || "[]"); } catch (e) { list = []; }
+    try { list = JSON.parse(store.get(provider + "_models") || "[]"); } catch (e) { list = []; }
     opts = list.length ? list.map((m, i) => [m.id, m.label + (i === 0 ? " (recomendado)" : "")])
       : [["auto", "Automático (se elige al probar la key)"]];
   }
@@ -428,7 +539,7 @@ const hal = {
       core.core_on_reply(writeIO(reply), ok ? 1 : 0);
     });
   },
-  hal_ai_reset() { claudeHistory = []; geminiHistory = []; },
+  hal_ai_reset() { claudeHistory = []; geminiHistory = []; nvidiaHistory = []; },
 
   hal_wifi_scan() {
     clearTimeout(wifiTimer);
@@ -554,10 +665,11 @@ function setupPanel() {
     showStatus();
     const p = PROVIDERS[provider];
     core.core_set_ai(writeIO(p.name), p.color);
-    if (newChat) { claudeHistory = []; geminiHistory = []; core.core_ai_new_chat(); }
+    document.getElementById("relaybox").hidden = provider !== "nvidia";
+    if (newChat) { claudeHistory = []; geminiHistory = []; nvidiaHistory = []; core.core_ai_new_chat(); }
   };
   prov.addEventListener("change", () => {
-    provider = prov.value === "gemini" ? "gemini" : "claude";
+    provider = pickProvider(prov.value);
     store.set("provider", provider);
     key.value = "";
     applyProvider(true);
@@ -567,6 +679,9 @@ function setupPanel() {
     store.set(PROVIDERS[provider].keyStore, v || null); key.value = ""; showStatus();
   });
   model.addEventListener("change", () => store.set("model_" + provider, model.value));
+  const relay = document.getElementById("relay");
+  relay.value = store.get("nvidia_relay") || "";
+  relay.addEventListener("change", () => { store.set("nvidia_relay", relay.value.trim() || null); });
   applyProvider(false);
 
   const testBtn = document.getElementById("testkey");
@@ -575,7 +690,7 @@ function setupPanel() {
     const k = key.value.trim() || store.get(p.keyStore);
     if (!k) { status.textContent = "Primero pega tu API key."; status.classList.remove("ok"); return; }
     testBtn.disabled = true; status.textContent = "Probando la key…"; status.classList.remove("ok");
-    const [ok, msg] = provider === "gemini" ? await testGemini(k) : await testClaude(k, model.value);
+    const [ok, msg] = provider === "gemini" ? await testGemini(k) : provider === "nvidia" ? await testNvidia(k) : await testClaude(k, model.value);
     if (ok && key.value.trim()) { store.set(p.keyStore, k); key.value = ""; key.placeholder = "•••••••• (guardada)"; }
     status.textContent = msg; status.classList.toggle("ok", ok);
     testBtn.disabled = false;
