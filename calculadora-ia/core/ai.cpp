@@ -3,6 +3,8 @@
 #include "gfx.h"
 #include "keys.h"
 #include "hal.h"
+#include "svg.h"
+#include "ti.h"
 
 char g_io[IO_CAP];
 
@@ -29,13 +31,24 @@ static int screen = S_CHAT;
 enum { R_USER, R_AI, R_SYS };
 #define CHAT_CAP 12000
 #define MAXMSG 64
-struct Msg { uint16_t off, len; uint8_t role; int16_t img; };   // img: id de la imagen adjunta o -1
+struct Msg { uint16_t off, len; uint8_t role; int16_t img, drw, grf; };   // foto, dibujo SVG y gráfica (o -1)
+
+// Dibujos SVG de la IA
+#define DRAW_CAP 24000
+struct Draw { uint16_t off, len; };
+static char dbuf[DRAW_CAP]; static int dused = 0;
+static Draw draws[32]; static int ndraw = 0;
+// Gráficas de la IA: funciones de x y ventana
+struct Graf { char f[10][80]; uint8_t fl[10]; uint8_t n; bool haswin; double w[4]; };
+static Graf grafs[6]; static int ngraf = 0;
+static bool switch_to_ti = false;
 static char cbuf[CHAT_CAP]; static int cused = 0;
 static Msg msgs[MAXMSG]; static int nmsg = 0;
 static int scroll = 0;            // líneas desde abajo
 static int sel_msg = -1;          // mensaje elegido con las flechas (-1 = ninguno)
 static bool view_arm = false;     // se apretó Y= con un mensaje con imagen elegido
 static int view_img = -1;         // imagen en pantalla completa
+static int view_drw = -1;         // o dibujo en pantalla completa
 static int next_img = 0;
 static bool waiting = false;
 static bool photo_attached = false;
@@ -54,7 +67,7 @@ static void add_msg(int role, const char* s, int n, int img) {
   while (nmsg >= MAXMSG || cused + n > CHAT_CAP) drop_oldest();
   m_copy(cbuf + cused, s, n);
   msgs[nmsg].off = (uint16_t)cused; msgs[nmsg].len = (uint16_t)n;
-  msgs[nmsg].role = (uint8_t)role; msgs[nmsg].img = (int16_t)img;
+  msgs[nmsg].role = (uint8_t)role; msgs[nmsg].img = (int16_t)img; msgs[nmsg].drw = -1; msgs[nmsg].grf = -1;
   nmsg++; cused += n; scroll = 0; g_dirty = true;
 }
 static void add_sys(const char* utf8) {
@@ -191,8 +204,24 @@ void ai_key(int k) {
   switch (screen) {
     case S_CHAT: {
       bool armed = view_arm; view_arm = false;
-      bool sel_img = sel_msg >= 0 && sel_msg < nmsg && msgs[sel_msg].img >= 0;
-      if (k == K_ENTER && armed && sel_img) { view_img = msgs[sel_msg].img; screen = S_IMAGE; return; }
+      bool sel_ok = sel_msg >= 0 && sel_msg < nmsg;
+      bool sel_img = sel_ok && (msgs[sel_msg].img >= 0 || msgs[sel_msg].drw >= 0 || msgs[sel_msg].grf >= 0);
+      if (k == K_ENTER && armed && sel_img) {
+        Msg& g = msgs[sel_msg];
+        if (g.grf >= 0) {                                  // graficar en la calculadora
+          Graf& G = grafs[g.grf];
+          const char* f[10]; int fl[10];
+          for (int i = 0; i < G.n; i++) { f[i] = G.f[i]; fl[i] = G.fl[i]; }
+          int bad = ti_load_graph(f, fl, G.n, G.haswin ? G.w : 0);
+          if (bad >= 0) { add_sys("No pude graficar esa función en la calculadora."); return; }
+          switch_to_ti = true;
+          return;
+        }
+        if (g.drw >= 0) { view_drw = g.drw; view_img = -1; }
+        else { view_img = g.img; view_drw = -1; }
+        screen = S_IMAGE;
+        return;
+      }
       if (k == K_ENTER || k == K_GRAPH) { sel_msg = -1; send_message(); return; }
       if (k == K_UP) { if (nmsg) sel_msg = sel_msg < 0 ? nmsg - 1 : (sel_msg > 0 ? sel_msg - 1 : 0); return; }
       if (k == K_DOWN) { if (sel_msg >= 0 && ++sel_msg >= nmsg) { sel_msg = -1; scroll = 0; } return; }
@@ -263,6 +292,7 @@ void ai_set_assistant(const char* utf8, int len, uint16_t color) {
 void ai_new_chat(void) {
   nmsg = 0; cused = 0; scroll = 0; waiting = false; sel_msg = -1; view_arm = false;
   hal_image_clear();
+  dused = 0; ndraw = 0; ngraf = 0;
   char m[48] = "Nuevo chat con ";
   s_cpy(m + 15, ai_name, sizeof m - 16);
   int n = s_len(m); m[n] = '.'; m[n + 1] = 0;
@@ -276,7 +306,10 @@ int ai_debug_text(char* out, int cap) {
   put(ai_name, s_len(ai_name)); put("\n", 1);
   for (int m = 0; m < nmsg; m++) {
     put(msgs[m].role == R_USER ? "> " : msgs[m].role == R_AI ? "< " : "# ", 2);
-    put(cbuf + msgs[m].off, msgs[m].len); put("\n", 1);
+    put(cbuf + msgs[m].off, msgs[m].len);
+    if (msgs[m].drw >= 0) put(" [dibujo]", 9);
+    if (msgs[m].grf >= 0) put(" [grafica]", 10);
+    put("\n", 1);
   }
   char st[32] = "#pantalla:0 sel:";
   st[10] = (char)('0' + screen);
@@ -287,10 +320,106 @@ int ai_debug_text(char* out, int cap) {
   return o;
 }
 
+// ------------------------------------------------------------------ dibujos y gráficas en las respuestas
+static int lower_c(int c) { return c >= 'A' && c <= 'Z' ? c + 32 : c; }
+static int find_ci(const char* s, int n, const char* w, int from) {
+  int L = s_len(w);
+  for (int i = from; i + L <= n; i++) {
+    int j = 0; while (j < L && lower_c((uint8_t)s[i + j]) == lower_c((uint8_t)w[j])) j++;
+    if (j == L) return i;
+  }
+  return -1;
+}
+static int cut(char* s, int n, int a, int b) { m_move(s + a, s + b, n - b); return n - (b - a); }
+
+static int extract_svg(char* s, int n, int* drw) {
+  int a, b;
+  while (svg_find(s, n, &a, &b)) {
+    int len = b - a;
+    if (*drw < 0 && len < DRAW_CAP) {
+      if (dused + len > DRAW_CAP || ndraw >= 32) {            // sin espacio: se olvidan los dibujos viejos
+        dused = 0; ndraw = 0;
+        for (int i = 0; i < nmsg; i++) msgs[i].drw = -1;
+      }
+      m_copy(dbuf + dused, s + a, len);
+      draws[ndraw].off = (uint16_t)dused; draws[ndraw].len = (uint16_t)len;
+      *drw = ndraw++; dused += len;
+    }
+    n = cut(s, n, a, b);
+  }
+  return n;
+}
+
+static bool read_num(const char*& p, const char* e, double* v) {
+  while (p < e && (*p == ' ' || *p == ',' || *p == ';')) p++;
+  double sg = 1, r = 0, f = 0; bool any = false;
+  if (p < e && (*p == '-' || *p == '+')) { if (*p == '-') sg = -1; p++; }
+  while (p < e && *p >= '0' && *p <= '9') { r = r * 10 + (*p++ - '0'); any = true; }
+  if (p < e && *p == '.') { p++; f = 0.1; while (p < e && *p >= '0' && *p <= '9') { r += (*p++ - '0') * f; f /= 10; any = true; } }
+  *v = sg * r;
+  return any;
+}
+
+static int extract_graph(char* s, int n, int* grf) {
+  int a = find_ci(s, n, "[GRAFICA]", 0);
+  int hl = 9;
+  if (a < 0) { a = find_ci(s, n, "[GR\xC1" "FICA]", 0); }
+  if (a < 0) return n;
+  int b = find_ci(s, n, "[/GRAFICA]", a), bl = 10;
+  if (b < 0) { b = find_ci(s, n, "[/GR\xC1" "FICA]", a); }
+  if (b < 0) { b = n; bl = 0; }
+  Graf& G = grafs[ngraf % 6];
+  G.n = 0; G.haswin = false;
+  int i = a + hl;
+  while (i < b) {
+    int e = i; while (e < b && s[e] != '\n') e++;
+    const char* p = s + i; int len = e - i;
+    while (len && (*p == ' ' || *p == '-' || *p == '*')) { p++; len--; }
+    while (len && (p[len - 1] == ' ' || p[len - 1] == '\r')) len--;
+    if (len >= 7 && find_ci(p, len, "ventana", 0) == 0) {
+      const char* q = p + 7; double w[4]; int k = 0;
+      while (k < 4 && read_num(q, p + len, &w[k])) k++;
+      if (k == 4) { m_copy(G.w, w, sizeof w); G.haswin = true; }
+    } else if (len > 0 && G.n < 10 && len < 80) {
+      bool eq = false; for (int j = 0; j < len; j++) if (p[j] == '=') eq = true;
+      bool has_x = false; for (int j = 0; j < len; j++) if (p[j] == 'x' || p[j] == 'X') has_x = true;
+      if (eq || has_x) { m_copy(G.f[G.n], p, len); G.fl[G.n] = (uint8_t)len; G.n++; }
+    }
+    i = e + 1;
+  }
+  if (G.n) { *grf = ngraf % 6; ngraf++; for (int m = 0; m < nmsg; m++) if (msgs[m].grf == *grf) msgs[m].grf = -1; }
+  return cut(s, n, a, b + bl > n ? n : b + bl);
+}
+
+// quita restos de bloques de código (```svg) y líneas vacías sobrantes
+static int tidy(char* s, int n) {
+  int o = 0;
+  for (int i = 0; i < n; i++) {
+    if (s[i] == '`' && i + 2 < n && s[i + 1] == '`' && s[i + 2] == '`') {
+      i += 3; while (i < n && s[i] != '\n' && s[i] != ' ') i++;
+      i--; continue;
+    }
+    if (s[i] == '\n' && o >= 2 && s[o - 1] == '\n' && s[o - 2] == '\n') continue;
+    s[o++] = s[i];
+  }
+  while (o && (s[o - 1] == '\n' || s[o - 1] == ' ')) o--;
+  int st = 0; while (st < o && (s[st] == '\n' || s[st] == ' ')) st++;
+  if (st) { m_move(s, s + st, o - st); o -= st; }
+  return o;
+}
+
+bool ai_take_switch(void) { bool r = switch_to_ti; switch_to_ti = false; return r; }
+
 void ai_on_reply(int len, int ok) {
   char* tmp = g_io;  // se convierte en el mismo buffer (la salida nunca es más larga)
   int n = utf8_to_local(g_io, len, tmp, IO_CAP);
+  int drw = -1, grf = -1;
+  if (ok) { n = extract_graph(tmp, n, &grf); n = extract_svg(tmp, n, &drw); n = tidy(tmp, n); }
+  if (!n) { const char* d = drw >= 0 ? "(dibujo)" : "(gráfica)"; n = utf8_to_local(d, s_len(d), tmp, 32); }
   add_msg(ok ? R_AI : R_SYS, tmp, n, -1);
+  msgs[nmsg - 1].drw = (int16_t)drw;
+  if (drw >= 0 && grf >= 0) add_msg(R_AI, "", 0, -1);     // la gráfica va en su propio mensaje
+  msgs[nmsg - 1].grf = (int16_t)grf;
   waiting = false;
 }
 
@@ -396,7 +525,7 @@ static void softkeys(const char* a, const char* b, const char* c, const char* d,
 #define CHAT_COLS 52
 #define MAXLINES 600
 struct Line { uint16_t off; uint8_t len, kind; int16_t msg; };
-enum { L_HUSER, L_HAI, L_USER, L_AI, L_SYS, L_PHOTO, L_PHOTO2, L_BLANK, L_WAIT };
+enum { L_HUSER, L_HAI, L_USER, L_AI, L_SYS, L_PHOTO, L_PHOTO2, L_DRAW, L_GRAF, L_BLANK, L_WAIT };
 static Line lines[MAXLINES]; static int nl, cur_msg;
 
 static void push_line(int off, int len, int kind) {
@@ -423,6 +552,8 @@ static void build_lines() {
     if (g.role == R_USER) push_line(0, 0, L_HUSER);
     if (g.role == R_AI) push_line(0, 0, L_HAI);
     if (g.img >= 0) { push_line(0, 0, L_PHOTO); push_line(0, 0, L_PHOTO2); push_line(0, 0, L_PHOTO2); }
+    if (g.drw >= 0) { push_line(0, 0, L_DRAW); push_line(0, 0, L_PHOTO2); push_line(0, 0, L_PHOTO2); }
+    if (g.grf >= 0) push_line(0, 0, L_GRAF);
     wrap(g.off, g.len, g.role == R_USER ? L_USER : g.role == R_AI ? L_AI : L_SYS, CHAT_COLS);
     cur_msg = -1;
     push_line(0, 0, L_BLANK);
@@ -495,6 +626,22 @@ static void draw_chat() {
         else if (l.msg == sel_msg) { char t[40]; utf8_to_local("Y= + ENTER: ver grande", 22, t, sizeof t); gfx_str(64, ly + 11, t, C_DIM); }
         break;
       case L_PHOTO2: break;
+      case L_DRAW: {
+        Draw& d = draws[msgs[l.msg].drw];
+        svg_render(dbuf + d.off, d.len, 10, ly, 46, 34, false);
+        if (l.msg == sel_msg) { char t[40]; utf8_to_local("Y= + ENTER: ver grande", 22, t, sizeof t); gfx_str(62, ly + 11, t, C_DIM); }
+        break;
+      }
+      case L_GRAF: {
+        Graf& G = grafs[msgs[l.msg].grf];
+        char t[60]; int n = utf8_to_local("Gráfica: ", 10, t, sizeof t);
+        int fl = G.fl[0] > 30 ? 30 : G.fl[0];
+        m_copy(t + n, G.f[0], fl); n += fl;
+        if (G.n > 1) { t[n++] = ' '; t[n++] = '+'; t[n++] = (char)('0' + G.n - 1); }
+        gfx_text(10, ly, t, n, C_OK);
+        if (l.msg == sel_msg) { char h[40]; int hn = utf8_to_local("  Y=+ENTER: graficar", 20, h, sizeof h); gfx_text(10 + n * CH_W, ly, h, hn, C_DIM); }
+        break;
+      }
       case L_WAIT: { char t[20] = "pensando"; int n = 8; for (int d = 0; d < dots; d++) t[n++] = '.'; gfx_text(10, ly, t, n, C_DIM); break; }
       case L_BLANK: break;
       default:
@@ -502,8 +649,11 @@ static void draw_chat() {
     }
   }
   if (scroll) gfx_str(SCR_W - 4 - 6 * CH_W, in_top - CH_H - 1, "\x87 m\xE1s", C_DIM);
-  bool sel_img = sel_msg >= 0 && sel_msg < nmsg && msgs[sel_msg].img >= 0;
-  softkeys(sel_img ? "Ver(+ENT)" : photo_attached ? "Quitar" : "", "Foto", "WiFi", "Nuevo", "Enviar");
+  bool sel_ok = sel_msg >= 0 && sel_msg < nmsg;
+  const char* f1 = photo_attached ? "Quitar" : "";
+  if (sel_ok && msgs[sel_msg].grf >= 0) f1 = "Graf(+ENT)";
+  else if (sel_ok && (msgs[sel_msg].img >= 0 || msgs[sel_msg].drw >= 0)) f1 = "Ver(+ENT)";
+  softkeys(f1, "Foto", "WiFi", "Nuevo", "Enviar");
 }
 
 static void draw_camera() {
@@ -573,6 +723,7 @@ static void draw_wifi() {
 
 static void draw_image() {
   gfx_fill(0, 0, SCR_W, SCR_H, 0);
+  if (view_drw >= 0) { Draw& d = draws[view_drw]; svg_render(dbuf + d.off, d.len, 0, 0, SCR_W, SCR_H, true); return; }
   if (!hal_image_draw(view_img, g_fb, SCR_W, 0, 0, SCR_W, SCR_H)) {
     char t[40]; utf8_to_local("La imagen ya no está disponible.", 32, t, sizeof t);
     gfx_str(20, 110, t, C_TEXT);

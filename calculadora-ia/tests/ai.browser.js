@@ -195,6 +195,37 @@ function realCall(url, headers, body) {
     check("Sí borra el chat", c.includes("Nuevo chat con") && !c.includes("> resuelve"), c);
   }
 
+  // 7c. dibujos SVG y gráficas que manda la IA
+  {
+    const svg = '<svg viewBox="0 0 320 240"><defs><marker id="f" markerWidth="10" markerHeight="10"><path d="M0,0 L10,5 L0,10 z"/></marker></defs>' +
+      '<polygon points="40,200 280,200 160,50" fill="none" stroke="blue" stroke-width="3"/>' +
+      '<line x1="20" y1="225" x2="140" y2="225" stroke="red" stroke-width="2" marker-end="url(#f)"/>' +
+      '<circle cx="160" cy="150" r="22" fill="orange"/><text x="160" y="36" text-anchor="middle" font-size="18" fill="black">Triángulo ABC</text>' +
+      '<text x="30" y="215" font-size="14" fill="#333">A</text><text x="282" y="215" font-size="14">B</text>' +
+      '<path d="M 60 190 Q 160 110 260 190" stroke="green" fill="none" stroke-width="2"/><rect x="250" y="20" width="50" height="30" fill="#ffe08a" stroke="black"/></svg>';
+    script = [ok("Mira el triángulo:\n```svg\n" + svg + "\n```\n[GRAFICA]\nY1=x^2-3\nY2=2sen(x)\nventana -5 5 -4 6\n[/GRAFICA]\nListo.")];
+    await type("dibuja"); await keys("ENTER"); await page.waitForTimeout(700);
+    let c = await chatText();
+    check("el dibujo y la gráfica salen del texto", c.includes("< Mira el triángulo:") && c.includes("Listo. [dibujo]") && c.includes("<  [grafica]") && !c.includes("<svg") && !c.includes("GRAFICA]"), c);
+    const sys = sent[sent.length - 1].body.system;
+    check("las instrucciones explican SVG y [GRAFICA]", /<svg viewBox/.test(sys) && /\[GRAFICA\]/.test(sys));
+    await keys("UP UP");
+    if (process.env.SHOT_DIR) await page.locator("#screen").screenshot({ path: process.env.SHOT_DIR + "/draw_thumb.png" });
+    await keys("YEQU ENTER");
+    c = await chatText();
+    check("Y= + ENTER muestra el dibujo en grande", c.includes("#pantalla:7"));
+    if (process.env.SHOT_DIR) await page.locator("#screen").screenshot({ path: process.env.SHOT_DIR + "/draw_full.png" });
+    await keys("CLEAR DOWN YEQU ENTER");
+    await page.waitForTimeout(300);
+    check("Y= + ENTER en la gráfica abre GRAPH en la calculadora", await page.evaluate(() => calc.core.core_mode()) === 0);
+    if (process.env.SHOT_DIR) await page.locator("#screen").screenshot({ path: process.env.SHOT_DIR + "/graf.png" });
+    await keys("YEQU"); await page.waitForTimeout(700);
+    const ti = await page.evaluate(() => { const n = calc.core.core_debug_ti(); let s = ""; for (const b of new Uint8Array(calc.core.memory.buffer, calc.core.core_io(), n)) s += String.fromCharCode(b); return s; });
+    check("las funciones quedan en Y=", ti.includes("Y1=X^2-3") && ti.includes("Y2=2sin(X)"), ti);
+    await keys("2ND MODE"); await page.evaluate(() => { calc.press(calc.K.YEQU, true); calc.press(calc.K.GRAPH, true); calc.press(calc.K.GRAPH, false); calc.press(calc.K.YEQU, false); });
+    await page.waitForTimeout(200);
+  }
+
   // 8. Gemini: cambiar de asistente, key inválida real, elegir modelo, reintentos y formato
   await page.selectOption("#provider", "gemini");
   await page.waitForTimeout(150);
