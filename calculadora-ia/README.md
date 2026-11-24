@@ -27,6 +27,7 @@ calculadora-ia/
 │       ├── graph.cpp  Y=, GRAPH, TRACE, CALC, ZOOM y TABLE
 │       ├── lcd.cpp    LCD de 96x64 ampliada x3
 │       └── ti.cpp     Navegación, errores (1:Quit 2:Goto), 2nd/ALPHA, ON/OFF
+├── functions/         Relevo de NVIDIA para Cloudflare Pages
 ├── simulador/         Plataforma "navegador": implementa hal.h con la cámara, fetch, etc.
 ├── tests/             Pruebas automáticas (modo normal y modo IA)
 ├── tools/             gen_font.py (fuentes), nvidia-relay/ (relevo en Cloudflare) y servidor-local (simulador local)
@@ -101,6 +102,27 @@ python3 -m http.server 8000
 Abre <http://localhost:8000>, elige **Claude**, **Gemini** o **NVIDIA**, pega tu API key en el panel y
 pulsa **Probar** (verifica la key sin gastar crédito). La key se guarda solo en ese navegador.
 
+## Publicar en Cloudflare Pages (se actualiza solo, con NVIDIA incluido)
+
+Se configura **una sola vez** y después cada cambio en `main` se publica solo en ~1 minuto.
+Además trae el relevo de NVIDIA incluido (`functions/nvidia/`), así que NVIDIA funciona
+también desde el celular, sin Worker aparte.
+
+1. Entra a **dash.cloudflare.com** (cuenta gratis) → **Workers & Pages** → **Create** →
+   pestaña **Pages** → **Connect to Git** (o "Import an existing Git repository").
+2. Autoriza GitHub y elige el repositorio **Config-Storage-Win32**.
+3. Configuración del proyecto:
+   - **Project name:** `calculadora-ia` (será `https://calculadora-ia.pages.dev`)
+   - **Production branch:** `main`
+   - **Framework preset:** `None`
+   - **Build command:** vacío
+   - **Build output directory:** `simulador`
+   - **Root directory (advanced):** `calculadora-ia`
+4. **Save and Deploy**. Listo: abre `https://calculadora-ia.pages.dev`.
+
+Cada rama nueva también se publica en un link de prueba (por ejemplo
+`https://claude-algo.calculadora-ia.pages.dev`), para probar cambios antes de pasarlos a `main`.
+
 ## Simulador local en Windows (NVIDIA sin Cloudflare)
 
 Para usar NVIDIA sin crear el relevo en Cloudflare, abre el simulador desde tu PC:
@@ -129,6 +151,7 @@ Necesitas `clang` con soporte WebAssembly (`wasm-ld`) y Node.js:
 node tests/ti.test.js           # pruebas del modo normal (teclas -> pantalla)
 (cd simulador && python3 -m http.server 8765 &) && node tests/ai.browser.js   # modo IA con Claude, Gemini y NVIDIA (Playwright)
 node tests/local.browser.js     # simulador local con el relevo de NVIDIA incluido
+node tests/pages-function.test.mjs   # relevo de Cloudflare Pages contra NVIDIA real
 python3 tools/gen_font.py core/font.h   # solo si cambias las fuentes
 ```
 

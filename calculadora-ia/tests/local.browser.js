@@ -30,8 +30,8 @@ const check = (name, cond, extra) => { if (cond) pass++; else { fail++; console.
   await page.waitForTimeout(600);
 
   check("abre con NVIDIA elegido", (await page.inputValue("#provider")) === "nvidia");
-  check("detecta el relevo local", /Relevo local activo/.test(await page.getAttribute("#relay", "placeholder")));
-  check("explica que no hace falta Cloudflare", /ya viene incluido/.test(await page.textContent("#relaynote")));
+  check("detecta el relevo local", /Relevo incluido/.test(await page.getAttribute("#relay", "placeholder")));
+  check("explica que no hace falta Cloudflare", /trae el relevo de NVIDIA incluido/.test(await page.textContent("#relaynote")));
 
   await page.fill("#apikey", "nvapi-invalida");
   await page.click("#testkey");
