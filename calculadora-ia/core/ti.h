@@ -9,3 +9,5 @@ void ti_key(int key);
 void ti_tick(uint32_t now);
 void ti_draw(void);
 bool ti_is_on(void);
+// Gráfica pedida por la IA: carga funciones en Y1.. y abre GRAPH (-1 = bien, si no el índice que falló)
+int ti_load_graph(const char* const* fns, const int* lens, int n, const double* win);

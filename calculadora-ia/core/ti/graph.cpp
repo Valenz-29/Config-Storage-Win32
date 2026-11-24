@@ -706,3 +706,92 @@ void table_draw(void) {
   line[o] = 0;
   tbl_text(0, 57, line, o > 16 ? 16 : o, false);
 }
+
+// ===================================================================== gráficas pedidas por la IA
+// Convierte texto como "x^2-3", "2sen(x)+√(x)" o "e^(-x)" a tokens de la TI. -1 si no se entiende.
+static bool operand_end(const uint8_t* t, int k) {
+  if (!k) return false;
+  int kind = tok(t[k - 1]).kind;
+  return kind == TK_NUM || kind == TK_RP || kind == TK_VAR || kind == TK_CONST || kind == TK_POST;
+}
+
+static int text_tokens(const char* s, int n, uint8_t* out, int cap) {
+  static const struct { const char* name; uint8_t t; } FN[] = {
+    { "arcsin", T_ASIN }, { "arccos", T_ACOS }, { "arctan", T_ATAN }, { "asin", T_ASIN }, { "acos", T_ACOS },
+    { "atan", T_ATAN }, { "sinh", T_SINH }, { "cosh", T_COSH }, { "tanh", T_TANH }, { "sqrt", T_SQRT },
+    { "raiz", T_SQRT }, { "sin", T_SIN }, { "sen", T_SIN }, { "cos", T_COS }, { "tan", T_TAN }, { "tg", T_TAN },
+    { "abs", T_ABS }, { "log", T_LOG }, { "ln", T_LN }, { "exp", T_EPOW },
+  };
+  int k = 0, i = 0;
+  while (i < n) {
+    uint8_t c = (uint8_t)s[i];
+    if (c == ' ' || c == '\t') { i++; continue; }
+    if (k >= cap - 3) return -1;
+    if ((c >= '0' && c <= '9') || c == '.') { out[k++] = c == '.' ? T_DOT : (uint8_t)(c - '0'); i++; continue; }
+    if (c == 'x' || c == 'X') { out[k++] = T_VX; i++; continue; }
+    if (c == '+') { out[k++] = T_ADD; i++; continue; }
+    if (c == '-') { out[k++] = operand_end(out, k) ? T_SUB : T_NEG; i++; continue; }
+    if (c == '*' || c == 0xD7 || c == 0xB7) { out[k++] = T_MUL; i++; continue; }
+    if (c == '/' || c == 0xF7) { out[k++] = T_DIV; i++; continue; }
+    if (c == '^') { out[k++] = T_POW; i++; continue; }
+    if (c == '(' || c == '[') { out[k++] = T_LP; i++; continue; }
+    if (c == ')' || c == ']') { out[k++] = T_RP; i++; continue; }
+    if (c == 0xB2) { out[k++] = T_SQR; i++; continue; }
+    if (c == 0xB3) { out[k++] = T_CUBE; i++; continue; }
+    if (c == CH_PI) { out[k++] = T_PI; i++; continue; }
+    int fn = -1, fl = 0;
+    if (c == CH_SQRT) { fn = T_SQRT; fl = 1; }
+    else for (unsigned f = 0; f < sizeof FN / sizeof FN[0]; f++) {
+      int L = s_len(FN[f].name), j = 0;
+      while (j < L && i + j < n && (s[i + j] | 32) == FN[f].name[j]) j++;
+      if (j == L) { fn = FN[f].t; fl = L; break; }
+    }
+    if (fn >= 0) {
+      i += fl;
+      while (i < n && s[i] == ' ') i++;
+      out[k++] = (uint8_t)fn;
+      if (i < n && s[i] == '(') { i++; continue; }            // el token ya incluye "("
+      // sin paréntesis (sen x, √2): toma un solo término
+      while (i < n && s[i] == ' ') i++;
+      if (i < n && (s[i] == 'x' || s[i] == 'X')) { out[k++] = T_VX; i++; }
+      else if (i < n && ((s[i] >= '0' && s[i] <= '9') || s[i] == '.')) { while (i < n && ((s[i] >= '0' && s[i] <= '9') || s[i] == '.')) { out[k++] = s[i] == '.' ? T_DOT : (uint8_t)(s[i] - '0'); i++; } }
+      else return -1;
+      out[k++] = T_RP;
+      continue;
+    }
+    if ((c == 'p' || c == 'P') && i + 1 < n && (s[i + 1] | 32) == 'i') { out[k++] = T_PI; i += 2; continue; }
+    if (c == 'e' && !(i + 1 < n && ((s[i + 1] | 32) >= 'a' && (s[i + 1] | 32) <= 'z'))) { out[k++] = T_E; i++; continue; }
+    return -1;
+  }
+  return k;
+}
+
+static double nice_step(double range) {
+  double raw = range / 10, p = 1;
+  while (p * 10 <= raw) p *= 10;
+  while (p > raw) p /= 10;
+  double m = raw / p;
+  return r14((m < 2 ? 1 : m < 5 ? 2 : 5) * p);
+}
+
+// Carga funciones en Y1.. y abre GRAPH. Devuelve -1 si todo bien, o el índice de la función que falló.
+int ti_load_graph(const char* const* fns, const int* lens, int n, const double* win) {
+  uint8_t t[10][MAXTOK]; int tn[10];
+  if (n > 10) n = 10;
+  for (int i = 0; i < n; i++) {
+    const char* s = fns[i]; int len = lens[i];
+    for (int j = 0; j < len; j++) if (s[j] == '=') { s += j + 1; len -= j + 1; break; }   // quita "Y1=", "f(x)="
+    tn[i] = text_tokens(s, len, t[i], MAXTOK);
+    double y;
+    if (tn[i] <= 0 || eval_at(t[i], tn[i], V_X, 1.2345, &y) == E_SYNTAX) return i;
+  }
+  for (int f = 0; f < 10; f++) { ed_clear(S.y[f]); S.ysel[f] = 1; }
+  for (int i = 0; i < n; i++) { m_copy(S.y[i].t, t[i], tn[i]); S.y[i].n = tn[i]; S.y[i].cur = tn[i]; }
+  if (win && win[0] < win[1] && win[2] < win[3]) {
+    S.xmin = r14(win[0]); S.xmax = r14(win[1]); S.ymin = r14(win[2]); S.ymax = r14(win[3]);
+    S.xscl = nice_step(S.xmax - S.xmin); S.yscl = nice_step(S.ymax - S.ymin);
+  } else { S.xmin = -10; S.xmax = 10; S.xscl = 1; S.ymin = -10; S.ymax = 10; S.yscl = 1; }
+  graph_dirty = true;
+  graph_open(G_PLAIN);
+  return -1;
+}

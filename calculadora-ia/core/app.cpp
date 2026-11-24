@@ -34,7 +34,7 @@ EXPORT(core_key) void core_key(int k, int is_down) {
 
   if (mode == M_AI) {
     if (!is_down) return;
-    if (k == K_ON) exit_ai(); else ai_key(k);
+    if (k == K_ON) exit_ai(); else { ai_key(k); if (ai_take_switch()) exit_ai(); }
     return;
   }
   // --- modo calculadora normal

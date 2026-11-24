@@ -84,6 +84,11 @@ emulador de la TI-83 Plus usando la ROM de tu propia calculadora.
     seguido: el simulador pide la lista, marca con "(fotos)" los que aceptan imágenes y, si un
     modelo fue retirado, elige otro solo. En la calculadora real no hace falta el relevo.
 - Foto: visor en vivo → revisión (Repetir/Usar) → la foto queda adjunta y escribes el mensaje.
+- **Dibujos:** la IA puede responder con un dibujo SVG simple (figuras, flechas, texto, colores)
+  que la calculadora dibuja (`core/svg.cpp`). Sale como miniatura en el chat y Y= + ENTER lo
+  muestra en grande. Funciona con Claude, Gemini y NVIDIA (ninguno necesita generar imágenes).
+- **Gráficas:** la IA puede mandar funciones en un bloque `[GRAFICA]`; Y= + ENTER las carga en Y=
+  y abre GRAPH en la calculadora, donde se usan TRACE, CALC y TABLE como siempre.
 - Reintenta solo si la IA está saturada o hay un corte de red; mensajes de error claros
   (key inválida, sin crédito, límite del plan gratis, sin internet, tiempo límite).
 - Con Claude usa caché de la API para que los chats largos y con fotos cuesten menos.
