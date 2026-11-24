@@ -24,12 +24,20 @@
       <select id="provider">
         <option value="claude">Claude (Anthropic)</option>
         <option value="gemini">Gemini (Google)</option>
+        <option value="nvidia">NVIDIA (build.nvidia.com)</option>
       </select>
       <label for="apikey" id="keylabel">API key</label>
       <div class="row">
         <input id="apikey" type="password" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
         <button id="savekey" type="button">Guardar</button>
         <button id="testkey" type="button" class="secondary">Probar</button>
+      </div>
+      <div id="relaybox" hidden>
+        <label for="relay">Relevo para el navegador (tu Worker de Cloudflare)</label>
+        <input id="relay" type="url" placeholder="https://nvidia-relevo.tu-usuario.workers.dev" autocomplete="off" spellcheck="false">
+        <p class="note">NVIDIA no permite llamadas desde páginas web, así que el simulador necesita un relevo propio (gratis).
+          <a href="https://github.com/Valenz-29/Config-Storage-Win32/tree/main/calculadora-ia/tools/nvidia-relay">Cómo crearlo</a>.
+          En la calculadora real no hace falta.</p>
       </div>
       <label for="model">Modelo</label>
       <select id="model"></select>

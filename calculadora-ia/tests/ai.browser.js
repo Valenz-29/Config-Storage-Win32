@@ -4,7 +4,9 @@
 // el caso de "key inválida" se reenvía a la API real con curl.
 "use strict";
 const { chromium } = require("playwright");
-const { execFileSync } = require("child_process");
+const { execFileSync, spawn } = require("child_process");
+const fs = require("fs");
+const path = require("path");
 
 const URL = process.env.SIM_URL || "http://localhost:8765/";
 let pass = 0, fail = 0;
@@ -23,6 +25,13 @@ function realCall(url, headers, body) {
 }
 
 (async () => {
+  const env = Object.assign({}, process.env, { NODE_USE_ENV_PROXY: "1", PORT: "8787" });
+  if (fs.existsSync("/root/.ccr/ca-bundle.crt")) env.NODE_EXTRA_CA_CERTS = "/root/.ccr/ca-bundle.crt";
+  const relay = spawn(process.execPath, [path.join(__dirname, "..", "tools", "nvidia-relay", "local.mjs")], { env, stdio: "ignore" });
+  for (let i = 0; i < 50; i++) {
+    try { await fetch("http://localhost:8787/v1/models", { headers: { origin: "http://localhost:8765" } }); break; }
+    catch (e) { await new Promise((z) => setTimeout(z, 200)); }
+  }
   const browser = await chromium.launch({ args: ["--use-fake-device-for-media-stream", "--use-fake-ui-for-media-stream"] });
   const page = await browser.newPage({ viewport: { width: 1000, height: 900 } });
   page.on("pageerror", (e) => { fail++; console.log("✗ error de JavaScript: " + e.message); });
@@ -61,6 +70,22 @@ function realCall(url, headers, body) {
     const next = gscript.shift() || { status: 500, body: {} };
     await new Promise((z) => setTimeout(z, 120));
     route.fulfill({ status: next.status, contentType: "application/json", headers: cors, body: JSON.stringify(next.body) });
+  });
+  const nsent = [];
+  let nscript = [], nmodels = null;
+  await page.route("http://localhost:8787/**", async (route) => {
+    const req = route.request(), url = req.url();
+    const auth = req.headers()["authorization"] || "";
+    const cors = { "access-control-allow-origin": "*" };
+    if (req.method() === "GET" && url.endsWith("/v1/models") && nmodels)
+      return route.fulfill({ status: 200, contentType: "application/json", headers: cors, body: JSON.stringify({ object: "list", data: nmodels }) });
+    if (req.method() === "POST" && url.endsWith("/v1/chat/completions") && auth === "Bearer nvapi-prueba") {
+      nsent.push({ url, headers: req.headers(), body: JSON.parse(req.postData()) });
+      const next = nscript.shift() || { status: 500, body: {} };
+      await new Promise((z) => setTimeout(z, 120));
+      return route.fulfill({ status: next.status, contentType: "application/json", headers: cors, body: JSON.stringify(next.body) });
+    }
+    return route.continue();                       // relevo real -> NVIDIA real
   });
   const chatText = () => page.evaluate(() => {
     const n = calc.core.core_debug_ai();
@@ -204,14 +229,81 @@ function realCall(url, headers, body) {
   check("si el modelo ya no existe, elige otro y reintenta", g.url.includes("gemini-3.6-flash:generateContent") &&
     chat.includes("< con el modelo nuevo") && (await page.inputValue("#model")) === "gemini-3.6-flash", g.url);
 
-  // 9. WiFi: red real y red de prueba con contraseña
+  // 9. NVIDIA: relevo, lista real de modelos, key inválida real, reintentos, fotos y modelos retirados
+  await page.selectOption("#provider", "nvidia");
+  await page.waitForTimeout(150);
+  chat = await chatText();
+  check("la pantalla dice NVIDIA y empieza un chat nuevo", chat.startsWith("NVIDIA\n") && chat.includes("Nuevo chat con NVIDIA."), chat.slice(0, 120));
+  check("muestra el campo del relevo", await page.isVisible("#relay"));
+  await page.fill("#apikey", "nvapi-invalida");
+  await page.click("#testkey");
+  await page.waitForFunction(() => !document.getElementById("testkey").disabled, null, { timeout: 10000 });
+  st = await page.textContent("#keystatus");
+  check("sin relevo pide configurarlo", /relevo/.test(st), st);
+  const beforeNoRelay = nsent.length;
+  await page.fill("#apikey", "nvapi-invalida"); await page.click("#savekey");
+  await type("hola"); await keys("ENTER"); await page.waitForTimeout(300);
+  chat = await chatText();
+  check("sin relevo avisa y no intenta llamar", nsent.length === beforeNoRelay && chat.includes("no puede hablar directo con NVIDIA"), chat.slice(-200));
+  await page.fill("#relay", "http://localhost:8787"); await page.dispatchEvent("#relay", "change");
+  await page.fill("#apikey", "nvapi-invalida");
+  await page.click("#testkey");
+  await page.waitForFunction(() => !document.getElementById("testkey").disabled, null, { timeout: 60000 });
+  st = await page.textContent("#keystatus");
+  check("key de NVIDIA inválida detectada (respuesta real a través del relevo)", /inválida/.test(st), st);
+  const nopts = await page.$$eval("#model option", (os) => os.map((o) => o.value));
+  check("lista real de modelos sin embeddings ni filtros", nopts.length > 5 && !nopts.some((o) => /embed|safety|guard/.test(o)), nopts.join(","));
+  const nmodel = await page.inputValue("#model");
+  check("elige por defecto un modelo de NVIDIA que acepta fotos", /^nvidia\//.test(nmodel) && /vl|omni|vision/.test(nmodel), nmodel);
+
+  await page.fill("#apikey", "nvapi-prueba"); await page.click("#savekey");
+  const nok = (text, finish) => ({ status: 200, body: { id: "chatcmpl-x", object: "chat.completion",
+    choices: [{ index: 0, message: { role: "assistant", content: text }, finish_reason: finish || "stop" }] } });
+  nscript = [{ status: 503, body: { status: 503, title: "Service Unavailable" } }, nok("<think>razonando…</think>¡Hola desde NVIDIA!")];
+  await type("hola nvidia"); await keys("ENTER"); await page.waitForTimeout(2600);
+  check("reintenta cuando NVIDIA está saturado", nsent.length === 2, "solicitudes: " + nsent.length);
+  let n = nsent[nsent.length - 1];
+  check("usa el modelo elegido y la key", n.body.model === nmodel && n.headers["authorization"] === "Bearer nvapi-prueba");
+  check("instrucciones y mensaje en formato chat", n.body.messages[0].role === "system" && /calculadora/.test(n.body.messages[0].content) &&
+    n.body.messages[1].role === "user" && n.body.messages[1].content === "hola nvidia", JSON.stringify(n.body.messages).slice(0, 200));
+  chat = await chatText();
+  check("muestra la respuesta sin el razonamiento", chat.includes("< ¡Hola desde NVIDIA!") && !chat.includes("razonando"), chat.slice(-200));
+
+  nscript = [nok("x = 4")];
+  await keys("WINDOW"); await page.waitForTimeout(1500);
+  await keys("ENTER"); await page.waitForTimeout(700);
+  await keys("GRAPH"); await page.waitForTimeout(200);
+  await type("resuelve"); await keys("ENTER"); await page.waitForTimeout(700);
+  n = nsent[nsent.length - 1];
+  const last = n.body.messages[n.body.messages.length - 1];
+  check("la foto va como image_url en base64", Array.isArray(last.content) && last.content[1].type === "image_url" &&
+    last.content[1].image_url.url.startsWith("data:image/jpeg;base64,") && n.body.messages.length === 4,
+    JSON.stringify(n.body.messages.map((m) => m.role)));
+
+  nscript = [{ status: 422, body: { status: 422, title: "Unprocessable Entity", detail: "Images are not supported" } }];
+  await keys("WINDOW"); await page.waitForTimeout(1500);
+  await keys("ENTER"); await page.waitForTimeout(700);
+  await keys("GRAPH"); await page.waitForTimeout(200);
+  await type("y esta"); await keys("ENTER"); await page.waitForTimeout(700);
+  chat = await chatText();
+  check("si el modelo no acepta fotos, lo dice", chat.includes("no acepta fotos"), chat.slice(-160));
+
+  nmodels = [{ id: "nvidia/nemotron-4-vl-200b", object: "model", owned_by: "nvidia", model_type: "vlm" }, { id: "nvidia/nemotron-4-embed", object: "model" }];
+  nscript = [{ status: 410, body: { status: 410, title: "Gone", detail: "The model has reached its end of life" } }, nok("con el modelo nuevo")];
+  await type("z"); await keys("ENTER"); await page.waitForTimeout(900);
+  n = nsent[nsent.length - 1];
+  chat = await chatText();
+  check("si NVIDIA retiró el modelo, elige otro y reintenta", n.body.model === "nvidia/nemotron-4-vl-200b" &&
+    chat.includes("< con el modelo nuevo") && (await page.inputValue("#model")) === "nvidia/nemotron-4-vl-200b", n.body.model);
+
+  // 10. WiFi: red real y red de prueba con contraseña
   await keys("ZOOM"); await page.waitForTimeout(1000);
   if (process.env.SHOT_DIR) await page.screenshot({ path: process.env.SHOT_DIR + "/ai_wifi.png" });
   await keys("DOWN ENTER"); await page.waitForTimeout(150);
   await type("12345678"); await keys("ENTER"); await page.waitForTimeout(1400);
   check("conecta a la red de prueba con contraseña", await page.evaluate(() => localStorage.getItem("wifi")) === "Red de prueba");
 
-  // 10. sin internet: la barra muestra "sin WiFi" y no se intenta enviar
+  // 11. sin internet: la barra muestra "sin WiFi" y no se intenta enviar
   const before = sent.length;
   await page.context().setOffline(true); await page.waitForTimeout(200);
   await type("hola"); await keys("ENTER"); await page.waitForTimeout(500);
@@ -219,11 +311,12 @@ function realCall(url, headers, body) {
   await page.context().setOffline(false); await page.waitForTimeout(300);
   if (process.env.SHOT_DIR) await page.locator("#screen").screenshot({ path: process.env.SHOT_DIR + "/ai_chat.png" });
 
-  // 11. ON vuelve a la calculadora
+  // 12. ON vuelve a la calculadora
   await keys("ON"); await page.waitForTimeout(100);
   check("ON vuelve al modo normal", await page.evaluate(() => calc.core.core_mode() === 0));
 
   await browser.close();
+  relay.kill();
   console.log(`\n${pass} comprobaciones OK, ${fail} fallaron`);
   process.exit(fail ? 1 : 0);
 })();

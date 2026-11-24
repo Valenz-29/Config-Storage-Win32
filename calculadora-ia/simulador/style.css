@@ -97,3 +97,4 @@ kbd { background: #2a2e39; border: 1px solid #3a3f4d; border-bottom-width: 2px; 
 .panel input#quick { margin-top: 2px; }
 .offscreen { position: fixed; left: 0; top: 0; width: 2px; height: 2px; opacity: 0; pointer-events: none; }
 .help { margin-top: 12px; }
+.note a { color: #8fb8ff; }
