@@ -29,7 +29,8 @@ calculadora-ia/
 │       └── ti.cpp     Navegación, errores (1:Quit 2:Goto), 2nd/ALPHA, ON/OFF
 ├── simulador/         Plataforma "navegador": implementa hal.h con la cámara, fetch, etc.
 ├── tests/             Pruebas automáticas (modo normal y modo IA)
-├── tools/             gen_font.py (genera las fuentes) y nvidia-relay/ (relevo para NVIDIA)
+├── tools/             gen_font.py (fuentes), nvidia-relay/ (relevo en Cloudflare) y servidor-local (simulador local)
+├── Abrir simulador local.bat   Doble clic en Windows: simulador + relevo de NVIDIA en tu PC
 └── build.sh           Compila core/ a simulador/core.wasm
 ```
 
@@ -100,6 +101,25 @@ python3 -m http.server 8000
 Abre <http://localhost:8000>, elige **Claude**, **Gemini** o **NVIDIA**, pega tu API key en el panel y
 pulsa **Probar** (verifica la key sin gastar crédito). La key se guarda solo en ese navegador.
 
+## Simulador local en Windows (NVIDIA sin Cloudflare)
+
+Para usar NVIDIA sin crear el relevo en Cloudflare, abre el simulador desde tu PC:
+
+1. En GitHub, en la página del repositorio, pulsa **Code → Download ZIP** y descomprímelo
+   (clic derecho → **Extraer todo**).
+2. Entra a la carpeta `calculadora-ia` y haz **doble clic en `Abrir simulador local.bat`**.
+   - Si Windows muestra "Windows protegió su PC", pulsa **Más información → Ejecutar de todas formas**
+     (pasa con cualquier archivo descargado de internet).
+3. Se abre el navegador con el simulador y **NVIDIA ya elegido**: el relevo viene incluido, así
+   que solo pegas tu key (`nvapi-...`) y pulsas **Probar**.
+4. Deja abierta la ventana negra mientras lo usas; para apagarlo, ciérrala.
+
+No hay que instalar nada: si tienes Node.js 18 o más nuevo lo usa, y si no, usa PowerShell
+(viene con Windows). Todo funciona solo en tu computador (`http://localhost:8000` o
+`http://127.0.0.1:8000`): tu key va directo de tu PC a NVIDIA y no se guarda en el servidor.
+La cámara del PC también funciona. Desde el celular sigue usando el link de GitHub Pages
+(con Claude o Gemini, o con NVIDIA y el relevo de Cloudflare).
+
 ## Recompilar y probar
 
 Necesitas `clang` con soporte WebAssembly (`wasm-ld`) y Node.js:
@@ -108,6 +128,7 @@ Necesitas `clang` con soporte WebAssembly (`wasm-ld`) y Node.js:
 ./build.sh                      # compila core/ -> simulador/core.wasm
 node tests/ti.test.js           # pruebas del modo normal (teclas -> pantalla)
 (cd simulador && python3 -m http.server 8765 &) && node tests/ai.browser.js   # modo IA con Claude, Gemini y NVIDIA (Playwright)
+node tests/local.browser.js     # simulador local con el relevo de NVIDIA incluido
 python3 tools/gen_font.py core/font.h   # solo si cambias las fuentes
 ```
 

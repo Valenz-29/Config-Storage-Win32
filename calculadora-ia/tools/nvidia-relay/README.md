@@ -26,13 +26,16 @@ El plan gratis de Cloudflare permite muchísimas más solicitudes por día de la
 Si abres el simulador desde otra dirección (por ejemplo tu propio dominio), agrégala a la
 lista `ALLOWED_ORIGINS` al principio de `worker.mjs` y vuelve a pulsar **Deploy**.
 
-## Usarlo en tu computador (sin Cloudflare)
+## Sin Cloudflare: simulador local en tu PC
 
-Con Node.js 18 o más nuevo:
+En Windows, haz doble clic en `calculadora-ia/Abrir simulador local.bat` (detalles en el
+[README principal](../../README.md#simulador-local-en-windows-nvidia-sin-cloudflare)). Abre el
+simulador en tu computador con el relevo ya incluido: no hay que configurar nada.
+
+En Mac o Linux, con Node.js 18 o más nuevo:
 
 ```sh
-node calculadora-ia/tools/nvidia-relay/local.mjs     # relevo en http://localhost:8787
-cd calculadora-ia/simulador && python3 -m http.server 8000
+node calculadora-ia/tools/servidor-local.mjs     # simulador + relevo en http://127.0.0.1:8000
 ```
 
-Abre <http://localhost:8000>, elige NVIDIA y pon `http://localhost:8787` como relevo.
+(`local.mjs` corre solo el relevo de Cloudflare en http://localhost:8787, por si lo quieres probar aparte.)

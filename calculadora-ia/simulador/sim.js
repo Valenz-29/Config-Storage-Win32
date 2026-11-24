@@ -359,7 +359,16 @@ async function testGemini(key) {
 // NVIDIA no permite llamadas desde páginas web (CORS), así que en el navegador se usa tu
 // relevo (tools/nvidia-relay). La calculadora real se conecta directo, sin relevo.
 let nvidiaHistory = [];
-const nvidiaRelay = () => (store.get("nvidia_relay") || "").trim().replace(/\/+$/, "");
+let localRelay = "";       // si el simulador se abrió con "Abrir simulador local.bat", el relevo viene incluido
+const nvidiaRelay = () => (store.get("nvidia_relay") || "").trim().replace(/\/+$/, "") || localRelay;
+
+async function detectLocalRelay() {
+  if (!/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) return;
+  try {
+    const r = await fetch("/nvidia/health", { cache: "no-store" });
+    if (r.ok && (await r.json()).ok) localRelay = location.origin + "/nvidia";
+  } catch (e) { /* servidor sin relevo (por ejemplo python -m http.server) */ }
+}
 const nvidiaBase = () => nvidiaRelay() + "/v1";
 const NO_RELAY = "El navegador no puede hablar directo con NVIDIA. Pega la dirección de tu relevo en el panel (ver instrucciones).";
 const nvidiaHeaders = (key) => Object.assign({ "content-type": "application/json", "accept": "application/json" },
@@ -681,6 +690,11 @@ function setupPanel() {
   model.addEventListener("change", () => store.set("model_" + provider, model.value));
   const relay = document.getElementById("relay");
   relay.value = store.get("nvidia_relay") || "";
+  if (localRelay) {
+    relay.placeholder = "Relevo local activo ✓ (no necesitas Cloudflare)";
+    document.getElementById("relaynote").textContent =
+      "Estás usando el simulador local: el relevo de NVIDIA ya viene incluido. Deja este campo vacío.";
+  }
   relay.addEventListener("change", () => { store.set("nvidia_relay", relay.value.trim() || null); });
   applyProvider(false);
 
@@ -719,6 +733,8 @@ async function main() {
   core = instance.exports; mem = core.memory;
   core.core_init();
   buildKeypad();
+  await detectLocalRelay();
+  if (localRelay && !store.get("provider")) provider = "nvidia";
   setupPanel();
   window.addEventListener("keydown", (e) => onKey(e, true));
   window.addEventListener("keyup", (e) => onKey(e, false));
