@@ -29,7 +29,7 @@ static int screen = S_CHAT;
 
 // ------------------------------------------------------------------ historial del chat
 enum { R_USER, R_AI, R_SYS };
-#define CHAT_CAP 12000
+#define CHAT_CAP 32000
 #define MAXMSG 64
 struct Msg { uint16_t off, len; uint8_t role; int16_t img, drw, grf; };   // foto, dibujo SVG y gráfica (o -1)
 
@@ -46,6 +46,9 @@ static char cbuf[CHAT_CAP]; static int cused = 0;
 static Msg msgs[MAXMSG]; static int nmsg = 0;
 static int scroll = 0;            // líneas desde abajo
 static int sel_msg = -1;          // mensaje elegido con las flechas (-1 = ninguno)
+static int sel_line = 0;          // primera línea visible dentro del mensaje elegido (si es largo)
+static int last_vis = 10;         // líneas de chat visibles en pantalla
+static int msg_lines(int m);
 static bool view_arm = false;     // se apretó Y= con un mensaje con imagen elegido
 static int view_img = -1;         // imagen en pantalla completa
 static int view_drw = -1;         // o dibujo en pantalla completa
@@ -63,7 +66,7 @@ static void drop_oldest() {
 }
 
 static void add_msg(int role, const char* s, int n, int img) {
-  if (n > CHAT_CAP / 2) n = CHAT_CAP / 2;
+  if (n > CHAT_CAP * 3 / 4) n = CHAT_CAP * 3 / 4;
   while (nmsg >= MAXMSG || cused + n > CHAT_CAP) drop_oldest();
   m_copy(cbuf + cused, s, n);
   msgs[nmsg].off = (uint16_t)cused; msgs[nmsg].len = (uint16_t)n;
@@ -223,8 +226,21 @@ void ai_key(int k) {
         return;
       }
       if (k == K_ENTER || k == K_GRAPH) { sel_msg = -1; send_message(); return; }
-      if (k == K_UP) { if (nmsg) sel_msg = sel_msg < 0 ? nmsg - 1 : (sel_msg > 0 ? sel_msg - 1 : 0); return; }
-      if (k == K_DOWN) { if (sel_msg >= 0 && ++sel_msg >= nmsg) { sel_msg = -1; scroll = 0; } return; }
+      if (k == K_UP || k == K_DOWN) {                 // elegir mensajes; los largos se leen por páginas
+        int page = last_vis > 3 ? last_vis - 2 : 1;
+        if (k == K_UP) {
+          if (!nmsg) return;
+          if (sel_msg >= 0 && sel_line > 0) { sel_line -= page; if (sel_line < 0) sel_line = 0; return; }
+          if (sel_msg < 0) sel_msg = nmsg - 1; else if (sel_msg > 0) sel_msg--; else return;
+          int c = msg_lines(sel_msg); sel_line = c > last_vis ? c - last_vis : 0;   // se ve su final
+        } else {
+          if (sel_msg < 0) return;
+          int c = msg_lines(sel_msg);
+          if (sel_line + last_vis < c) { sel_line += page; if (sel_line > c - last_vis) sel_line = c - last_vis; return; }
+          if (++sel_msg >= nmsg) { sel_msg = -1; scroll = 0; } else sel_line = 0;
+        }
+        return;
+      }
       if (k == K_YEQU) {
         if (sel_img) { view_arm = true; return; }      // Y= + ENTER: ver la imagen del mensaje
         if (photo_attached) { photo_attached = false; hal_photo_discard(); }
@@ -314,7 +330,12 @@ int ai_debug_text(char* out, int cap) {
   char st[32] = "#pantalla:0 sel:";
   st[10] = (char)('0' + screen);
   int sn = 16; int v = sel_msg; if (v < 0) { st[sn++] = '-'; v = 1; }
-  st[sn++] = (char)('0' + v % 10); st[sn++] = '\n';
+  st[sn++] = (char)('0' + v % 10);
+  st[sn++] = ' '; st[sn++] = 'l'; st[sn++] = 'i'; st[sn++] = 'n'; st[sn++] = ':';
+  int L = sel_line < 0 ? 0 : sel_line;
+  if (L >= 100) st[sn++] = (char)('0' + L / 100 % 10);
+  if (L >= 10) st[sn++] = (char)('0' + L / 10 % 10);
+  st[sn++] = (char)('0' + L % 10); st[sn++] = '\n';
   put(st, sn);
   out[o] = 0;
   return o;
@@ -523,7 +544,7 @@ static void softkeys(const char* a, const char* b, const char* c, const char* d,
 
 // --- chat
 #define CHAT_COLS 52
-#define MAXLINES 600
+#define MAXLINES 2000
 struct Line { uint16_t off; uint8_t len, kind; int16_t msg; };
 enum { L_HUSER, L_HAI, L_USER, L_AI, L_SYS, L_PHOTO, L_PHOTO2, L_DRAW, L_GRAF, L_BLANK, L_WAIT };
 static Line lines[MAXLINES]; static int nl, cur_msg;
@@ -562,6 +583,13 @@ static void build_lines() {
   if (waiting) { push_line(0, 0, L_HAI); push_line(0, 0, L_WAIT); }
 }
 
+static int msg_lines(int m) {
+  build_lines();
+  int c = 0;
+  for (int i = 0; i < nl; i++) if (lines[i].msg == m) c++;
+  return c;
+}
+
 static void draw_chat() {
   status_bar(ai_name, ai_color);
   // área de escritura (abajo)
@@ -587,14 +615,22 @@ static void draw_chat() {
   // mensajes
   build_lines();
   int top = 15, vis = (in_top - 2 - top) / CH_H;
+  last_vis = vis;
   int max_scroll = nl - vis; if (max_scroll < 0) max_scroll = 0;
   if (sel_msg >= 0) {                                  // que se vea el mensaje elegido
     int fl = -1, ll = -1;
     for (int i = 0; i < nl; i++) if (lines[i].msg == sel_msg) { if (fl < 0) fl = i; ll = i; }
     if (fl >= 0) {
-      int st = nl - vis - scroll;
-      if (ll >= st + vis) st = ll - vis + 1;
-      if (fl < st) st = fl;
+      int cnt = ll - fl + 1, st;
+      if (cnt > vis) {                                 // mensaje largo: mostrar la página elegida
+        if (sel_line > cnt - vis) sel_line = cnt - vis;
+        if (sel_line < 0) sel_line = 0;
+        st = fl + sel_line;
+      } else {
+        st = nl - vis - scroll;
+        if (ll >= st + vis) st = ll - vis + 1;
+        if (fl < st) st = fl;
+      }
       scroll = nl - vis - st;
       if (scroll < 0) scroll = 0;
     }
@@ -648,7 +684,7 @@ static void draw_chat() {
         gfx_text(10, ly, cbuf + l.off, l.len, l.kind == L_USER ? C_USER : l.kind == L_AI ? C_TEXT : C_WARN);
     }
   }
-  if (scroll) gfx_str(SCR_W - 4 - 6 * CH_W, in_top - CH_H - 1, "\x87 m\xE1s", C_DIM);
+  if (scroll) gfx_str(SCR_W - 4 - 6 * CH_W, in_top - CH_H - 1, "\x92 m\xE1s", C_DIM);
   bool sel_ok = sel_msg >= 0 && sel_msg < nmsg;
   const char* f1 = photo_attached ? "Quitar" : "";
   if (sel_ok && msgs[sel_msg].grf >= 0) f1 = "Graf(+ENT)";

@@ -166,7 +166,7 @@ python3 tools/gen_font.py core/font.h   # solo si cambias las fuentes
 | 2nd + (−) / 2nd + 3 / 2nd + . | ¿ / ¡ / , |
 | 0 (en letras) | Espacio |
 | DEL / CLEAR | Borrar / borrar todo |
-| ▲ ▼ | Elegir un mensaje del chat (CLEAR deja de elegir) |
+| ▲ ▼ | Elegir un mensaje del chat; en los largos, avanzar por páginas (CLEAR deja de elegir) |
 | Y= + ENTER | Con un mensaje con foto elegido: verla en pantalla completa |
 | F1 (Y=) | Quitar la foto adjunta |
 | F2 (WINDOW) | Cámara |
