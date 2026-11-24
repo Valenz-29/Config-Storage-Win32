@@ -81,6 +81,12 @@ EXPORT(core_input_char) void core_input_char(uint32_t cp) {
 // Texto de la pantalla del modo normal (para pruebas automáticas)
 int ti_debug_text(char* out, int cap);
 EXPORT(core_debug_ti) int core_debug_ti(void) { return ti_debug_text(g_io, IO_CAP); }
+int ai_debug_text(char* out, int cap);
+EXPORT(core_debug_ai) int core_debug_ai(void) { return ai_debug_text(g_io, IO_CAP); }
+
+// El simulador elige el asistente (nombre en core_io, color RGB565) y puede empezar un chat nuevo
+EXPORT(core_set_ai) void core_set_ai(int len, int color) { ai_set_assistant(g_io, len, (uint16_t)color); }
+EXPORT(core_ai_new_chat) void core_ai_new_chat(void) { ai_new_chat(); }
 
 EXPORT(core_on_reply) void core_on_reply(int len, int ok) { ai_on_reply(len, ok); }
 EXPORT(core_on_photo) void core_on_photo(int ok) { ai_on_photo(ok); }

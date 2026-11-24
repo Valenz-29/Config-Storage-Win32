@@ -21,6 +21,8 @@ bool ai_wants_text(void);
 void ai_tick(uint32_t now);
 void ai_draw(void);
 void ai_on_reply(int len, int ok);
+void ai_set_assistant(const char* utf8, int len, uint16_t color);
+void ai_new_chat(void);
 void ai_on_photo(int ok);
 void ai_on_wifi_scan(int len);
 void ai_on_wifi_result(int ok);

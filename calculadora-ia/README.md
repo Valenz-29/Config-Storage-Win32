@@ -68,11 +68,16 @@ emulador de la TI-83 Plus usando la ROM de tu propia calculadora.
 
 ## Modo IA
 
-- Chat con Claude (Opus 5.5 por defecto; se puede elegir Sonnet 5.5 o Haiku 5.5).
+- Chat con **Claude** o **Gemini** (se elige en el panel del simulador; cada uno con su key).
+  - Claude: Opus 5.5 por defecto, también Sonnet 5.5 o Haiku 5.5. La key se saca en
+    console.anthropic.com y necesita crédito.
+  - Gemini: la key se saca gratis en aistudio.google.com. Los modelos cambian seguido, así que
+    el simulador le pregunta a Google cuáles hay y elige el "flash" estable más nuevo. En el
+    plan gratis Google puede usar lo que envías para mejorar sus productos: no mandes datos personales.
 - Foto: visor en vivo → revisión (Repetir/Usar) → la foto queda adjunta y escribes el mensaje.
-- Reintenta solo si Claude está saturado o hay un corte de red; mensajes de error claros
-  (key inválida, sin crédito, sin internet, tiempo límite).
-- Usa caché de la API para que los chats largos y con fotos cuesten menos.
+- Reintenta solo si la IA está saturada o hay un corte de red; mensajes de error claros
+  (key inválida, sin crédito, límite del plan gratis, sin internet, tiempo límite).
+- Con Claude usa caché de la API para que los chats largos y con fotos cuesten menos.
 - **WiFi en el simulador:** el navegador no puede elegir redes, así que usa el internet real
   del equipo («Este equipo (real)»). La «Red de prueba» sirve para practicar la pantalla de
   contraseña (cualquier clave de 8 o más caracteres). En la calculadora real esa pantalla
@@ -87,8 +92,8 @@ cd calculadora-ia/simulador
 python3 -m http.server 8000
 ```
 
-Abre <http://localhost:8000>, pega tu API key de Anthropic en el panel y pulsa **Probar**
-(verifica la key sin gastar crédito). La key se guarda solo en ese navegador.
+Abre <http://localhost:8000>, elige **Claude** o **Gemini**, pega tu API key en el panel y
+pulsa **Probar** (verifica la key sin gastar crédito). La key se guarda solo en ese navegador.
 
 ## Recompilar y probar
 
@@ -97,7 +102,7 @@ Necesitas `clang` con soporte WebAssembly (`wasm-ld`) y Node.js:
 ```sh
 ./build.sh                      # compila core/ -> simulador/core.wasm
 node tests/ti.test.js           # pruebas del modo normal (teclas -> pantalla)
-(cd simulador && python3 -m http.server 8765 &) && node tests/ai.browser.js   # modo IA (Playwright)
+(cd simulador && python3 -m http.server 8765 &) && node tests/ai.browser.js   # modo IA con Claude y Gemini (Playwright)
 python3 tools/gen_font.py core/font.h   # solo si cambias las fuentes
 ```
 

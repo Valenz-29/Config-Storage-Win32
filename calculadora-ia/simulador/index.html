@@ -19,20 +19,21 @@
     <p class="lead">Es el mismo código en C++ que va a correr en la XIAO ESP32S3, compilado para el navegador.</p>
 
     <div class="card">
-      <h2>1. Configura Claude</h2>
-      <label for="apikey">API key de Anthropic</label>
+      <h2>1. Configura la IA</h2>
+      <label for="provider">Asistente</label>
+      <select id="provider">
+        <option value="claude">Claude (Anthropic)</option>
+        <option value="gemini">Gemini (Google)</option>
+      </select>
+      <label for="apikey" id="keylabel">API key</label>
       <div class="row">
         <input id="apikey" type="password" placeholder="sk-ant-..." autocomplete="off" spellcheck="false">
         <button id="savekey" type="button">Guardar</button>
         <button id="testkey" type="button" class="secondary">Probar</button>
       </div>
       <label for="model">Modelo</label>
-      <select id="model">
-        <option value="claude-opus-5-5">Claude Opus 5.5 (el más capaz)</option>
-        <option value="claude-sonnet-5-5">Claude Sonnet 5.5</option>
-        <option value="claude-haiku-5-5">Claude Haiku 5.5 (el más barato)</option>
-      </select>
-      <p class="note" id="keystatus">La key se guarda solo en este navegador y se envía únicamente a api.anthropic.com.</p>
+      <select id="model"></select>
+      <p class="note" id="keystatus"></p>
     </div>
 
     <div class="card">
