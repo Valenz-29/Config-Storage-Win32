@@ -226,6 +226,32 @@ function realCall(url, headers, body) {
     await page.waitForTimeout(200);
   }
 
+  // 7d. respuestas largas: no se cortan y se leen por páginas
+  {
+    let long = "INICIO de la respuesta larga.\n";
+    for (let i = 1; i <= 80; i++) long += "- Punto " + i + ": explicación detallada del paso número " + i + " del ejercicio.\n";
+    long += "FINAL de la respuesta.";
+    script = [ok(long)];
+    await type("explicame todo con detalle"); await keys("ENTER"); await page.waitForTimeout(700);
+    let c = await chatText();
+    check("la respuesta larga llega completa", c.includes("INICIO de la respuesta") && c.includes("Punto 80:") && c.includes("FINAL de la respuesta."));
+    const sys = sent[sent.length - 1].body.system;
+    check("las instrucciones permiten respuestas extensas", /todo lo extenso que haga falta/.test(sys) && !/120 palabras/.test(sys));
+    await keys("UP");
+    c = await chatText();
+    const lin0 = +(c.match(/lin:(\d+)/) || [])[1];
+    check("▲ elige la respuesta y muestra su final", lin0 > 50, c.slice(-30));
+    const selA = (c.match(/sel:(\S+)/) || [])[1];
+    for (let i = 0; i < 30 && !/lin:0\b/.test(c); i++) { await keys("UP"); c = await chatText(); }
+    check("sigue en el mismo mensaje mientras sube", (c.match(/sel:(\S+)/) || [])[1] === selA);
+    check("▲ sube por páginas hasta el inicio del mensaje", /lin:0\b/.test(c), c.slice(-30));
+    if (process.env.SHOT_DIR) await page.locator("#screen").screenshot({ path: process.env.SHOT_DIR + "/long_top.png" });
+    await keys("DOWN");
+    c = await chatText();
+    check("▼ avanza una página dentro del mismo mensaje", (c.match(/sel:(\S+)/) || [])[1] === selA && +(c.match(/lin:(\d+)/) || [])[1] > 0, c.slice(-30));
+    await keys("CLEAR");
+  }
+
   // 8. Gemini: cambiar de asistente, key inválida real, elegir modelo, reintentos y formato
   await page.selectOption("#provider", "gemini");
   await page.waitForTimeout(150);
