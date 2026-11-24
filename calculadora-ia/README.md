@@ -27,7 +27,9 @@ calculadora-ia/
 │       ├── graph.cpp  Y=, GRAPH, TRACE, CALC, ZOOM y TABLE
 │       ├── lcd.cpp    LCD de 96x64 ampliada x3
 │       └── ti.cpp     Navegación, errores (1:Quit 2:Goto), 2nd/ALPHA, ON/OFF
-├── functions/         Relevo de NVIDIA para Cloudflare Pages
+├── wrangler.jsonc     Configuración para publicar en Cloudflare
+├── worker/            Worker de Cloudflare (sirve el simulador y /nvidia/*)
+├── functions/         Relevo de NVIDIA (lo usa el Worker; también sirve en Cloudflare Pages)
 ├── simulador/         Plataforma "navegador": implementa hal.h con la cámara, fetch, etc.
 ├── tests/             Pruebas automáticas (modo normal y modo IA)
 ├── tools/             gen_font.py (fuentes), nvidia-relay/ (relevo en Cloudflare) y servidor-local (simulador local)
@@ -102,26 +104,21 @@ python3 -m http.server 8000
 Abre <http://localhost:8000>, elige **Claude**, **Gemini** o **NVIDIA**, pega tu API key en el panel y
 pulsa **Probar** (verifica la key sin gastar crédito). La key se guarda solo en ese navegador.
 
-## Publicar en Cloudflare Pages (se actualiza solo, con NVIDIA incluido)
+## Publicar en Cloudflare (se actualiza solo, con NVIDIA incluido)
 
 Se configura **una sola vez** y después cada cambio en `main` se publica solo en ~1 minuto.
-Además trae el relevo de NVIDIA incluido (`functions/nvidia/`), así que NVIDIA funciona
-también desde el celular, sin Worker aparte.
+Trae el relevo de NVIDIA incluido, así que NVIDIA funciona también desde el celular.
+La configuración está en `wrangler.jsonc` (sirve `simulador/`) y `worker/index.mjs` (atiende `/nvidia/*`).
 
-1. Entra a **dash.cloudflare.com** (cuenta gratis) → **Workers & Pages** → **Create** →
-   pestaña **Pages** → **Connect to Git** (o "Import an existing Git repository").
-2. Autoriza GitHub y elige el repositorio **Config-Storage-Win32**.
-3. Configuración del proyecto:
-   - **Project name:** `calculadora-ia` (será `https://calculadora-ia.pages.dev`)
-   - **Production branch:** `main`
-   - **Framework preset:** `None`
-   - **Build command:** vacío
-   - **Build output directory:** `simulador`
-   - **Root directory (advanced):** `calculadora-ia`
-4. **Save and Deploy**. Listo: abre `https://calculadora-ia.pages.dev`.
+1. **dash.cloudflare.com** → **Workers & Pages** → **Create** → **Import a repository** (Git).
+2. Elige **Config-Storage-Win32** y completa:
+   - **Nombre del proyecto:** `calculadora-ia`
+   - **Comando de compilación:** vacío
+   - **Implementar comando:** `npx wrangler deploy`
+   - **Ruta** (configuración avanzada, carpeta raíz): `/calculadora-ia`
+3. **Implementar**. Queda en `https://calculadora-ia.TU-USUARIO.workers.dev`.
 
-Cada rama nueva también se publica en un link de prueba (por ejemplo
-`https://claude-algo.calculadora-ia.pages.dev`), para probar cambios antes de pasarlos a `main`.
+Con "compilaciones de vista previa" activadas, cada rama nueva tiene su propio link de prueba.
 
 ## Simulador local en Windows (NVIDIA sin Cloudflare)
 

@@ -1,0 +1,11 @@
+// Configuración para publicar en Cloudflare (Workers con archivos estáticos).
+// Cloudflare sirve la carpeta simulador/ y el Worker atiende /nvidia/* (el relevo de NVIDIA).
+{
+  "name": "calculadora-ia",
+  "main": "worker/index.mjs",
+  "compatibility_date": "2025-09-01",
+  "assets": {
+    "directory": "./simulador",
+    "binding": "ASSETS"
+  }
+}
