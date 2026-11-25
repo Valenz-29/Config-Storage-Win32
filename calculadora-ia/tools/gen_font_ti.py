@@ -119,15 +119,19 @@ g(0xB2, '.##..','...#.','..#..','.###.','.....','.....','.....')   # ²
 g(0xB3, '.###.','..#..','...#.','.##..','.....','.....','.....')   # ³
 g(0xB0, '.#...','#.#..','.#...','.....','.....','.....','.....')   # °
 
-out = ["// Generado por tools/gen_font_ti.py - no editar a mano.",
-       "// Fuente grande de la TI-83 Plus: 5x7 en celdas de 6x8 (fila 0 vacía).",
-       "#pragma once", "#include <stdint.h>",
-       "struct TiGlyph { uint8_t ch; uint8_t rows[8]; };",
-       "static const TiGlyph TI_FONT[] = {"]
-for c in sorted(G, key=lambda k: k if isinstance(k, int) else ord(k)):
-    code = c if isinstance(c, int) else ord(c)
-    rows = [0] + [sum(0x80 >> i for i, ch in enumerate(r) if ch == '#') for r in G[c]]
-    out.append("  { 0x%02x, { %s } }," % (code, ", ".join("0x%02x" % b for b in rows)))
-out.append("};")
-open("core/ti/font_ti.h", "w").write("\n".join(out) + "\n")
-print(len(G), "glifos")
+def main():
+  out = ["// Generado por tools/gen_font_ti.py - no editar a mano.",
+         "// Fuente grande de la TI-83 Plus: 5x7 en celdas de 6x8 (fila 0 vacía).",
+         "#pragma once", "#include <stdint.h>",
+         "struct TiGlyph { uint8_t ch; uint8_t rows[8]; };",
+         "static const TiGlyph TI_FONT[] = {"]
+  for c in sorted(G, key=lambda k: k if isinstance(k, int) else ord(k)):
+      code = c if isinstance(c, int) else ord(c)
+      rows = [0] + [sum(0x80 >> i for i, ch in enumerate(r) if ch == '#') for r in G[c]]
+      out.append("  { 0x%02x, { %s } }," % (code, ", ".join("0x%02x" % b for b in rows)))
+  out.append("};")
+  open("core/ti/font_ti.h", "w").write("\n".join(out) + "\n")
+  print(len(G), "glifos")
+
+if __name__ == "__main__":
+  main()

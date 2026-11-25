@@ -1,5 +1,45 @@
 # Genera core/font.h: fuente bitmap 6x12 (ASCII + Latin-1) desde DejaVu Sans Mono.
-import sys
+import sys, os, unicodedata
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from gen_font_ti import G as TI   # misma letra 5x7 que el modo normal
+
+def rows_of(strs):
+    return [sum(0x80 >> i for i, ch in enumerate(r) if ch == '#') for r in strs]
+# Letras con cola: en la celda de 12 filas bajan por debajo de la línea (filas 4..10).
+DESC = {
+  'g': ['.####','#...#','#...#','#...#','.####','....#','.###.'],
+  'p': ['####.','#...#','#...#','#...#','####.','#....','#....'],
+  'q': ['.####','#...#','#...#','#...#','.####','....#','....#'],
+  'y': ['#...#','#...#','#...#','#...#','.####','....#','.###.'],
+}
+ACC = {'\u0301': ['...#.','..#..'], '\u0300': ['.#...','..#..'], '\u0302': ['..#..','.#.#.'],
+       '\u0308': ['.....','.#.#.'], '\u0303': ['.##.#','#.##.']}
+DOTLESS_I = ['.....','.....','.##..','..#..','..#..','..#..','.###.']
+def ti_cell(c):
+    """Glifo 6x12 hecho con la letra de la TI (o None si no hay)."""
+    ch = chr(c)
+    cell = [0] * 12
+    if ch in DESC:
+        for k, b in enumerate(rows_of(DESC[ch])): cell[4 + k] = b
+        return cell
+    if ch == 'j':
+        for k, b in enumerate(rows_of(['...#.','.....','..##.','...#.','...#.','...#.','...#.','#..#.','.##..'])): cell[2 + k] = b
+        return cell
+    if ch in TI:
+        for k, b in enumerate(rows_of(TI[ch])): cell[2 + k] = b
+        return cell
+    if ch in '¿¡':
+        base = TI['?' if ch == '¿' else '!'][::-1]
+        for k, b in enumerate(rows_of(base)): cell[3 + k] = b
+        return cell
+    d = unicodedata.normalize('NFD', ch)
+    if len(d) == 2 and d[0] in TI and d[1] in ACC and d[0].isalpha():
+        base = DOTLESS_I if d[0] == 'i' else TI[d[0]]
+        for k, b in enumerate(rows_of(base)): cell[2 + k] = b
+        top = 2 if d[0].islower() else 0       # el acento va sobre la letra
+        for k, b in enumerate(rows_of(ACC[d[1]])): cell[top + k] |= b
+        return cell
+    return None
 from PIL import Image, ImageDraw, ImageFont
 W, H = 6, 12
 font = ImageFont.truetype("/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf", 10)
@@ -11,6 +51,9 @@ out = ["// Generado por tools/gen_font.py - no editar a mano", "#pragma once", "
 for c in chars:
     img = Image.new("L", (W, H), 0)
     ImageDraw.Draw(img).text((0, -1), chr(c), font=font, fill=255)
+    rows = ti_cell(c)
+    if rows:
+        out.append("  {" + ",".join(f"0x{r:02x}" for r in rows) + "}, // " + (repr(chr(c)) if c != 92 else "backslash")); continue
     rows = []
     if c == ord("0"):  # el 0 sale igual al 8 a este tamano: dibujarlo a mano
         rows = [0,0x30,0x48,0x48,0x48,0x48,0x48,0x30,0,0,0,0]

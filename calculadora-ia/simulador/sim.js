@@ -38,7 +38,18 @@ const LAYOUT = [
 let core, mem;
 const canvas = document.getElementById("screen");
 const ctx = canvas.getContext("2d");
-const image = ctx.createImageData(320, 240);
+// La imagen real (320x240) se arma aparte y se copia ampliada por un número entero:
+// así ningún pixel se pierde ni se duplica cuando la pantalla del celular no mide justo 320.
+const lcd = document.createElement("canvas");
+lcd.width = 320; lcd.height = 240;
+const lctx = lcd.getContext("2d");
+const image = lctx.createImageData(320, 240);
+function fitScreen() {
+  const css = canvas.getBoundingClientRect().width || 320;
+  const k = Math.max(1, Math.ceil(css * (window.devicePixelRatio || 1) / 320));
+  if (canvas.width !== 320 * k) { canvas.width = 320 * k; canvas.height = 240 * k; if (core) present(); }
+}
+window.addEventListener("resize", fitScreen);
 const video = document.getElementById("video");
 const t0 = performance.now();
 
@@ -598,7 +609,9 @@ function present() {
     const p = fb[i];
     d[j] = ((p >> 11) & 31) * 255 / 31; d[j + 1] = ((p >> 5) & 63) * 255 / 63; d[j + 2] = (p & 31) * 255 / 31; d[j + 3] = 255;
   }
-  ctx.putImageData(image, 0, 0);
+  lctx.putImageData(image, 0, 0);
+  ctx.imageSmoothingEnabled = false;
+  ctx.drawImage(lcd, 0, 0, canvas.width, canvas.height);
 }
 function loop() {
   core.core_tick();
@@ -761,6 +774,6 @@ async function main() {
   window.addEventListener("online", reconnect);
   window.addEventListener("offline", () => core.core_on_wifi_result(0));
   window.calc = { core, K, press };                // para pruebas
-  loop();
+  fitScreen(); present(); loop();
 }
 main().catch((e) => { document.body.insertAdjacentHTML("afterbegin", `<p style="color:#f88">Error al cargar: ${e.message}. Abre esta página con un servidor local (ver README).</p>`); });
