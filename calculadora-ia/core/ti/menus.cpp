@@ -13,13 +13,60 @@ struct MenuDef { const MTab* tabs; uint8_t ntabs; };
 #define N(a) (uint8_t)(sizeof(a) / sizeof(a[0]))
 #define TK(t) { 0, A_PASTE, t }
 
+// Menús que llegan con el emulador: se ven igual que en la TI y cada opción explica que falta.
+#define IN(l, w) { l, A_INFO, w }
+static const MItem M_CPX[] = { IN("conj(", INFO_COMPLEX), IN("real(", INFO_COMPLEX), IN("imag(", INFO_COMPLEX),
+  IN("angle(", INFO_COMPLEX), IN("abs(", INFO_COMPLEX), IN("\x8CRect", INFO_COMPLEX), IN("\x8CPolar", INFO_COMPLEX) };
+static const MItem M_DDRAW[] = { IN("ShadeNorm(", INFO_DRAW), IN("Shade_t(", INFO_DRAW), IN("Shade\x8F\xB2(", INFO_DRAW),
+  IN("ShadeF(", INFO_DRAW) };
+static const MItem M_SEDIT[] = { IN("Edit...", INFO_STAT), IN("SortA(", INFO_STAT), IN("SortD(", INFO_STAT),
+  IN("ClrList", INFO_STAT), IN("SetUpEditor", INFO_STAT) };
+static const MItem M_SCALC[] = { IN("1-Var Stats", INFO_STAT), IN("2-Var Stats", INFO_STAT), IN("Med-Med", INFO_STAT),
+  IN("LinReg(ax+b)", INFO_STAT), IN("QuadReg", INFO_STAT), IN("CubicReg", INFO_STAT), IN("QuartReg", INFO_STAT),
+  IN("LinReg(a+bx)", INFO_STAT), IN("LnReg", INFO_STAT), IN("ExpReg", INFO_STAT), IN("PwrReg", INFO_STAT),
+  IN("Logistic", INFO_STAT), IN("SinReg", INFO_STAT) };
+static const MItem M_STESTS[] = { IN("Z-Test...", INFO_STAT), IN("T-Test...", INFO_STAT), IN("2-SampZTest...", INFO_STAT),
+  IN("2-SampTTest...", INFO_STAT), IN("1-PropZTest...", INFO_STAT), IN("2-PropZTest...", INFO_STAT),
+  IN("ZInterval...", INFO_STAT), IN("TInterval...", INFO_STAT), IN("2-SampZInt...", INFO_STAT),
+  IN("2-SampTInt...", INFO_STAT), IN("1-PropZInt...", INFO_STAT), IN("2-PropZInt...", INFO_STAT),
+  IN("\x8F\xB2-Test...", INFO_STAT), IN("2-SampFTest...", INFO_STAT), IN("LinRegTTest...", INFO_STAT), IN("ANOVA(", INFO_STAT) };
+static const MTab T_STATM[] = { { "EDIT", M_SEDIT, N(M_SEDIT) }, { "CALC", M_SCALC, N(M_SCALC) }, { "TESTS", M_STESTS, N(M_STESTS) } };
+static const MItem M_LNAMES[] = { IN("L1", INFO_LIST), IN("L2", INFO_LIST), IN("L3", INFO_LIST), IN("L4", INFO_LIST),
+  IN("L5", INFO_LIST), IN("L6", INFO_LIST) };
+static const MItem M_LOPS[] = { IN("SortA(", INFO_LIST), IN("SortD(", INFO_LIST), IN("dim(", INFO_LIST), IN("Fill(", INFO_LIST),
+  IN("seq(", INFO_LIST), IN("cumSum(", INFO_LIST), IN("\x8EList(", INFO_LIST), IN("Select(", INFO_LIST),
+  IN("augment(", INFO_LIST), IN("List\x8Cmatr(", INFO_LIST), IN("Matr\x8Clist(", INFO_LIST), IN("L", INFO_LIST) };
+static const MItem M_LMATH[] = { IN("min(", INFO_LIST), IN("max(", INFO_LIST), IN("mean(", INFO_LIST), IN("median(", INFO_LIST),
+  IN("sum(", INFO_LIST), IN("prod(", INFO_LIST), IN("stdDev(", INFO_LIST), IN("variance(", INFO_LIST) };
+static const MTab T_LISTM[] = { { "NAMES", M_LNAMES, N(M_LNAMES) }, { "OPS", M_LOPS, N(M_LOPS) }, { "MATH", M_LMATH, N(M_LMATH) } };
+static const MItem M_MNAMES[] = { IN("[A]", INFO_MATRIX), IN("[B]", INFO_MATRIX), IN("[C]", INFO_MATRIX), IN("[D]", INFO_MATRIX),
+  IN("[E]", INFO_MATRIX), IN("[F]", INFO_MATRIX), IN("[G]", INFO_MATRIX), IN("[H]", INFO_MATRIX), IN("[I]", INFO_MATRIX),
+  IN("[J]", INFO_MATRIX) };
+static const MItem M_MMATH[] = { IN("det(", INFO_MATRIX), IN("T", INFO_MATRIX), IN("dim(", INFO_MATRIX), IN("Fill(", INFO_MATRIX),
+  IN("identity(", INFO_MATRIX), IN("randM(", INFO_MATRIX), IN("augment(", INFO_MATRIX), IN("Matr\x8Clist(", INFO_MATRIX),
+  IN("List\x8Cmatr(", INFO_MATRIX), IN("cumSum(", INFO_MATRIX), IN("ref(", INFO_MATRIX), IN("rref(", INFO_MATRIX),
+  IN("rowSwap(", INFO_MATRIX), IN("row+(", INFO_MATRIX), IN("*row(", INFO_MATRIX), IN("*row+(", INFO_MATRIX) };
+static const MTab T_MATRXM[] = { { "NAMES", M_MNAMES, N(M_MNAMES) }, { "MATH", M_MMATH, N(M_MMATH) }, { "EDIT", M_MNAMES, N(M_MNAMES) } };
+static const MItem M_PNEW[] = { IN("Create New", INFO_PRGM) };
+static const MTab T_PRGMM[] = { { "EXEC", 0, 0 }, { "EDIT", 0, 0 }, { "NEW", M_PNEW, 1 } };
+static const MItem M_DRAW[] = { IN("ClrDraw", INFO_DRAW), IN("Line(", INFO_DRAW), IN("Horizontal", INFO_DRAW),
+  IN("Vertical", INFO_DRAW), IN("Tangent(", INFO_DRAW), IN("DrawF", INFO_DRAW), IN("Shade(", INFO_DRAW),
+  IN("DrawInv", INFO_DRAW), IN("Circle(", INFO_DRAW), IN("Text(", INFO_DRAW), IN("Pen", INFO_DRAW) };
+static const MItem M_POINTS[] = { IN("Pt-On(", INFO_DRAW), IN("Pt-Off(", INFO_DRAW), IN("Pt-Change(", INFO_DRAW),
+  IN("Pxl-On(", INFO_DRAW), IN("Pxl-Off(", INFO_DRAW), IN("Pxl-Change(", INFO_DRAW), IN("pxl-Test(", INFO_DRAW) };
+static const MItem M_DSTO[] = { IN("StorePic", INFO_DRAW), IN("RecallPic", INFO_DRAW), IN("StoreGDB", INFO_DRAW),
+  IN("RecallGDB", INFO_DRAW) };
+static const MTab T_DRAWM[] = { { "DRAW", M_DRAW, N(M_DRAW) }, { "POINTS", M_POINTS, N(M_POINTS) }, { "STO", M_DSTO, N(M_DSTO) } };
+static const MItem M_APPS[] = { IN("Finance...", INFO_APPS) };
+static const MTab T_APPSM[] = { { "APPLICATIONS", M_APPS, 1 } };
+
 static const MItem M_MATH[] = { TK(T_FRAC), TK(T_DEC), TK(T_CUBE), TK(T_CBRT), TK(T_XROOT), TK(T_FMIN),
   TK(T_FMAX), TK(T_NDERIV), TK(T_FNINT), { "Solver...", A_INFO, INFO_SOLVER } };
 static const MItem M_NUM[] = { TK(T_ABS), TK(T_ROUND), TK(T_IPART), TK(T_FPART), TK(T_INT), TK(T_MINF),
   TK(T_MAXF), TK(T_LCM), TK(T_GCD) };
 static const MItem M_PRB[] = { TK(T_RAND), { "nPr", A_PASTE, T_NPR }, { "nCr", A_PASTE, T_NCR }, TK(T_FACT),
   TK(T_RANDINT), TK(T_RANDNORM), TK(T_RANDBIN) };
-static const MTab T_MATHM[] = { { "MATH", M_MATH, N(M_MATH) }, { "NUM", M_NUM, N(M_NUM) }, { "PRB", M_PRB, N(M_PRB) } };
+static const MTab T_MATHM[] = { { "MATH", M_MATH, N(M_MATH) }, { "NUM", M_NUM, N(M_NUM) }, { "CPX", M_CPX, N(M_CPX) }, { "PRB", M_PRB, N(M_PRB) } };
 
 static const MItem M_TEST[] = { TK(T_EQ), TK(T_NE), TK(T_GT), TK(T_GE), TK(T_LT), TK(T_LE) };
 static const MItem M_LOGIC[] = { { "and", A_PASTE, T_AND }, { "or", A_PASTE, T_OR }, { "xor", A_PASTE, T_XOR }, TK(T_NOT) };
@@ -30,7 +77,7 @@ static const MTab T_ANGLEM[] = { { "ANGLE", M_ANGLE, N(M_ANGLE) } };
 
 static const MItem M_DISTR[] = { TK(T_NORMPDF), TK(T_NORMCDF), TK(T_INVNORM), TK(T_TPDF), TK(T_TCDF), TK(T_CHIPDF),
   TK(T_CHICDF), TK(T_FPDF), TK(T_FCDF), TK(T_BINPDF), TK(T_BINCDF), TK(T_POIPDF), TK(T_POICDF), TK(T_GEOPDF), TK(T_GEOCDF) };
-static const MTab T_DISTRM[] = { { "DISTR", M_DISTR, N(M_DISTR) } };
+static const MTab T_DISTRM[] = { { "DISTR", M_DISTR, N(M_DISTR) }, { "DRAW", M_DDRAW, N(M_DDRAW) } };
 
 static const MItem M_VARS[] = { { "Window...", A_SUB, MENU_VWIN }, { "Zoom...", A_INFO, INFO_GDB },
   { "GDB...", A_INFO, INFO_GDB }, { "Picture...", A_INFO, INFO_PIC }, { "Statistics...", A_INFO, INFO_STATVARS },
@@ -74,10 +121,12 @@ static const MItem M_CALC[] = { { "value", A_ACT, ACT_CALC + 1 }, { "zero", A_AC
   { "dy/dx", A_ACT, ACT_CALC + 6 }, { "\x90" "f(x)dx", A_ACT, ACT_CALC + 7 } };
 static const MTab T_CALCM[] = { { "CALCULATE", M_CALC, N(M_CALC) } };
 
+
 static const MenuDef MENUS[MENU_COUNT] = {
-  { T_MATHM, N(T_MATHM) }, { T_TESTM, N(T_TESTM) }, { T_ANGLEM, 1 }, { T_DISTRM, 1 }, { T_VARSM, N(T_VARSM) },
+  { T_MATHM, N(T_MATHM) }, { T_TESTM, N(T_TESTM) }, { T_ANGLEM, 1 }, { T_DISTRM, 2 }, { T_VARSM, N(T_VARSM) },
   { T_MEMM, 1 }, { T_ZOOMM, N(T_ZOOMM) }, { T_CALCM, 1 }, { T_VWINM, 1 }, { T_VTBLM, 1 }, { T_YFUNCM, 1 },
   { T_YONOFFM, 1 }, { T_RESETM, 1 }, { T_RALLM, 1 }, { T_RDEFM, 1 },
+  { T_STATM, 3 }, { T_LISTM, 3 }, { T_MATRXM, 3 }, { T_PRGMM, 3 }, { T_DRAWM, 3 }, { T_APPSM, 1 },
 };
 
 static int mcur = 0, mtab = 0, mitem = 0, mtop = 0, mret = SC_HOME;
@@ -120,9 +169,9 @@ void menu_key(int k, int mod) {
     switch (k) {
       case K_LEFT: mtab = (mtab + m.ntabs - 1) % m.ntabs; mitem = 0; mtop = 0; return;
       case K_RIGHT: mtab = (mtab + 1) % m.ntabs; mitem = 0; mtop = 0; return;
-      case K_UP: mitem = (mitem + tb.n - 1) % tb.n; break;
-      case K_DOWN: mitem = (mitem + 1) % tb.n; break;
-      case K_ENTER: menu_select(tb.items[mitem]); return;
+      case K_UP: if (tb.n) mitem = (mitem + tb.n - 1) % tb.n; break;
+      case K_DOWN: if (tb.n) mitem = (mitem + 1) % tb.n; break;
+      case K_ENTER: if (tb.n) menu_select(tb.items[mitem]); return;
       case K_CLEAR: go(mret == SC_MENU ? SC_HOME : mret); return;
     }
     if (k == K_UP || k == K_DOWN) {
@@ -172,12 +221,12 @@ struct FRow { uint8_t type; const char* label; const char* const* opts; uint8_t 
 static const char* const O_NOT[] = { "Normal", "Sci", "Eng" };
 static const char* const O_FIX[] = { "Float", "0", "1", "2", "3", "4", "5", "6", "7", "8", "9" };
 static const char* const O_ANG[] = { "Radian", "Degree" };
-static const char* const O_FUNC[] = { "Func" };
+static const char* const O_FUNC[] = { "Func", "Par", "Pol", "Seq" };
 static const char* const O_DOT[] = { "Connected", "Dot" };
 static const char* const O_SIM[] = { "Sequential", "Simul" };
-static const char* const O_REAL[] = { "Real" };
-static const char* const O_FULL[] = { "Full" };
-static const char* const O_RECT[] = { "RectGC" };
+static const char* const O_REAL[] = { "Real", "a+bi", "re^\x88i" };
+static const char* const O_FULL[] = { "Full", "Horiz", "G-T" };
+static const char* const O_RECT[] = { "RectGC", "PolarGC" };
 static const char* const O_COORD[] = { "CoordOn", "CoordOff" };
 static const char* const O_GRID[] = { "GridOff", "GridOn" };
 static const char* const O_AXES[] = { "AxesOn", "AxesOff" };
@@ -187,10 +236,10 @@ static const char* const O_AUTO[] = { "Auto" };
 
 static const FRow F_MODE[] = {
   { R_CHOICE, 0, O_NOT, 3, 1, 0 }, { R_CHOICE, 0, O_FIX, 11, 0, 1 }, { R_CHOICE, 0, O_ANG, 2, 1, 2 },
-  { R_CHOICE, 0, O_FUNC, 1, 1, 3 }, { R_CHOICE, 0, O_DOT, 2, 1, 4 }, { R_CHOICE, 0, O_SIM, 2, 1, 5 },
-  { R_CHOICE, 0, O_REAL, 1, 1, 6 }, { R_CHOICE, 0, O_FULL, 1, 1, 7 } };
+  { R_CHOICE, 0, O_FUNC, 4, 1, 3 }, { R_CHOICE, 0, O_DOT, 2, 1, 4 }, { R_CHOICE, 0, O_SIM, 2, 1, 5 },
+  { R_CHOICE, 0, O_REAL, 3, 1, 6 }, { R_CHOICE, 0, O_FULL, 3, 1, 7 } };
 static const FRow F_FORMAT[] = {
-  { R_CHOICE, 0, O_RECT, 1, 1, 10 }, { R_CHOICE, 0, O_COORD, 2, 1, 11 }, { R_CHOICE, 0, O_GRID, 2, 1, 12 },
+  { R_CHOICE, 0, O_RECT, 2, 1, 10 }, { R_CHOICE, 0, O_COORD, 2, 1, 11 }, { R_CHOICE, 0, O_GRID, 2, 1, 12 },
   { R_CHOICE, 0, O_AXES, 2, 1, 13 }, { R_CHOICE, 0, O_LABEL, 2, 1, 14 }, { R_CHOICE, 0, O_EXPR, 2, 1, 15 } };
 static const FRow F_WINDOW[] = {
   { R_TITLE, "WINDOW", 0, 0, 0, 0 }, { R_VALUE, "Xmin", 0, 0, 0, 30 }, { R_VALUE, "Xmax", 0, 0, 0, 31 },
@@ -205,6 +254,9 @@ static const FRow F_FACT[] = {
 static const FRow* frows = F_MODE;
 static int fcount = 0, frow = 0, fopt = 0, fwhich = 0;
 static Editor fed;
+
+// Opciones que se ven pero aún no se pueden elegir (Par, a+bi, Horiz, PolarGC...).
+static int selectable(const FRow& r) { return r.id == 3 || r.id == 6 || r.id == 7 || r.id == 10 ? 1 : r.nopts; }
 
 static int choice_get(int id) {
   switch (id) {
@@ -294,7 +346,7 @@ void form_key(int k, int mod) {
   if (r.type == R_CHOICE) {
     if (mod == MOD_NONE) {
       if (k == K_LEFT) { if (fopt > 0) fopt--; return; }
-      if (k == K_RIGHT) { if (fopt < r.nopts - 1) fopt++; return; }
+      if (k == K_RIGHT) { if (fopt < selectable(r) - 1) fopt++; return; }
       if (k == K_ENTER) { choice_set(r.id, fopt); return; }
       if (k == K_CLEAR) { go_home(); return; }
     }

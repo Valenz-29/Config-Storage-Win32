@@ -366,5 +366,25 @@ test("FORMAT GridOn y AxesOff", () => {
   if (!pixel(47 + 5, 31 - 3)) throw new Error("falta la cuadrícula");
 });
 
+test("menús con las pestañas de la TI-83 Plus", () => {
+  const want = { "MATH": "MATH NUM CPX PRB", "STAT": "EDIT CALC TESTS", "2nd STAT": "NAMES OPS MATH",
+    "2nd x-1": "NAMES MATH EDIT", "PRGM": "EXEC EDIT NEW", "2nd PRGM": "DRAW POINTS STO",
+    "2nd VARS": "DISTR DRAW", "APPS": "APPLICATIONS" };
+  for (const k in want) { reset(); press(k); expectRow(0, want[k]); }
+  reset(); press("STAT RIGHT"); expectRow(4, "4:LinReg(ax+b)");
+  reset(); press("PRGM ENTER UP DOWN"); expectRow(0, "EXEC EDIT NEW");   // lista vacía: no se cae
+});
+test("MODE y FORMAT muestran todas las opciones", () => {
+  press("MODE"); expectRow(3, "Func Par Pol Seq"); expectRow(6, "Real a+bi re^θi"); expectRow(7, "Full Horiz G-T");
+  press("DOWN DOWN DOWN RIGHT ENTER CLEAR MODE"); expectRow(3, "Func Par Pol Seq");
+  press("2nd ZOOM"); expectRow(0, "RectGC PolarGC");
+});
+test("fuente grande 5x7 de la TI", () => {
+  press("2");                               // el 2 de la TI: .###. / #...# / ....# ...
+  const rows = [];
+  for (let y = 1; y <= 7; y++) { let s = ""; for (let x = 0; x < 5; x++) s += pixel(x, y) ? "#" : "."; rows.push(s); }
+  if (rows.join("/") !== ".###./#...#/....#/...#./..#../.#.../#####") throw new Error(rows.join("/"));
+});
+
 console.log(`\n${pass} pruebas OK, ${fail} fallaron`);
 process.exit(fail ? 1 : 0);

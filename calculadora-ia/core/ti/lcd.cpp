@@ -1,5 +1,6 @@
 // lcd.cpp - La pantalla de la TI-83 Plus: 96x64 pixeles, texto grande 16x8 y texto chico.
 // Se dibuja ampliada x3 en la TFT de 320x240.
+#include "font_ti.h"
 #include "ti_int.h"
 #include "../font_small.h"
 
@@ -18,12 +19,27 @@ void lcd_set(int x, int y, int v) { if ((unsigned)x < LCD_W && (unsigned)y < LCD
 int  lcd_get(int x, int y) { return ((unsigned)x < LCD_W && (unsigned)y < LCD_H) ? lcd_px[y][x] : 0; }
 
 // Dibuja nrows filas del glifo grande (desde la fila r0) en la posición de pixel (x, y).
+static const uint8_t* ti_glyph(uint8_t ch) {
+  static int16_t idx[256];
+  static bool ready = false;
+  if (!ready) {
+    for (int i = 0; i < 256; i++) idx[i] = -1;
+    for (int i = 0; i < (int)(sizeof TI_FONT / sizeof TI_FONT[0]); i++) idx[TI_FONT[i].ch] = (int16_t)i;
+    ready = true;
+  }
+  return idx[ch] >= 0 ? TI_FONT[idx[ch]].rows : 0;
+}
+
 void lcd_glyph_px(int x, int y, uint8_t ch, int r0, int nrows, bool inv) {
-  const uint8_t* g = gfx_glyph(ch);
-  int shift = (ch == 'g' || ch == 'p' || ch == 'q' || ch == 'y' || ch == 'j' || ch == ',' || ch == ';') ? 2 : 0;
+  const uint8_t* g = ti_glyph(ch);
+  int shift = 0, h = 8;
+  if (!g) {           // símbolos sin glifo de la TI: fuente general
+    g = gfx_glyph(ch); h = 12;
+    shift = (ch == 'g' || ch == 'p' || ch == 'q' || ch == 'y' || ch == 'j' || ch == ',' || ch == ';') ? 2 : 0;
+  }
   for (int r = 0; r < nrows; r++) {
     int src = r0 + r + shift;
-    uint8_t bits = src < 12 ? g[src] : 0;
+    uint8_t bits = src < h ? g[src] : 0;
     for (int c = 0; c < 6; c++) {
       int on = (bits & (0x80 >> c)) ? 1 : 0;
       lcd_set(x + c, y + r, inv ? !on : on);
