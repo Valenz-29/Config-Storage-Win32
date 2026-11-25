@@ -169,7 +169,8 @@ extern Editor home_ed;
 
 // menús y formularios
 enum { MENU_MATH, MENU_TEST, MENU_ANGLE, MENU_DISTR, MENU_VARS, MENU_MEM, MENU_ZOOM, MENU_CALC,
-       MENU_VWIN, MENU_VTBL, MENU_YFUNC, MENU_YONOFF, MENU_RESET, MENU_RALL, MENU_RDEF, MENU_COUNT };
+       MENU_VWIN, MENU_VTBL, MENU_YFUNC, MENU_YONOFF, MENU_RESET, MENU_RALL, MENU_RDEF,
+       MENU_STAT, MENU_LIST, MENU_MATRX, MENU_PRGM, MENU_DRAW, MENU_APPS, MENU_COUNT };
 void menu_open(int m);
 void menu_key(int k, int mod);
 void menu_draw(void);

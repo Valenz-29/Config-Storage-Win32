@@ -150,9 +150,9 @@ bool nav_key(int k, int mod) {
       case K_VARS: open_paste_menu(MENU_DISTR); return true;
       case K_ADD: if (screen == SC_FORM && !form_commit()) return true; menu_open(MENU_MEM); return true;
       case K_0: catalog_paste_open(); return true;
-      case K_INV: show_info(INFO_MATRIX); return true;
-      case K_STAT: show_info(INFO_LIST); return true;
-      case K_PRGM: show_info(INFO_DRAW); return true;
+      case K_INV: open_paste_menu(MENU_MATRX); return true;
+      case K_STAT: open_paste_menu(MENU_LIST); return true;
+      case K_PRGM: open_paste_menu(MENU_DRAW); return true;
       case K_XTTN: show_info(INFO_LINK); return true;
       case K_DOT: show_info(INFO_COMPLEX); return true;
       case K_7: case K_8: case K_9: show_info(INFO_SEQ); return true;
@@ -172,9 +172,9 @@ bool nav_key(int k, int mod) {
       case K_GRAPH: if (screen == SC_FORM && !form_commit()) return true; graph_open(G_PLAIN); return true;
       case K_MATH: open_paste_menu(MENU_MATH); return true;
       case K_VARS: open_paste_menu(MENU_VARS); return true;
-      case K_APPS: show_info(INFO_APPS); return true;
-      case K_PRGM: show_info(INFO_PRGM); return true;
-      case K_STAT: show_info(INFO_STAT); return true;
+      case K_APPS: open_paste_menu(MENU_APPS); return true;
+      case K_PRGM: open_paste_menu(MENU_PRGM); return true;
+      case K_STAT: open_paste_menu(MENU_STAT); return true;
     }
   }
   return false;
